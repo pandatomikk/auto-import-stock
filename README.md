@@ -12,15 +12,6 @@ Je peux vous accompagner dans la mise en place de votre boutique WooCommerce, so
 
 **Pour présenter votre projet ou échanger sur vos besoins : [ZPSI — zpsi.fr](https://zpsi.fr).**
 
-## Pourquoi ce projet, et comment il est développé
-
-Je ne suis pas développeur de métier. J’avais des demandes concrètes de commerçants, mais ni les compétences ni le temps nécessaires pour développer seul l’outil de manière classique, et personne de disponible pour le réaliser. J’ai donc choisi de le construire avec l’aide de l’IA, dans une démarche souvent appelée « vibe coding ».
-
-Ce choix m’a permis de transformer un besoin de terrain en une base utilisable. Le code reste un chantier en évolution : il comporte des tests automatisés, mais ceux-ci ne garantissent pas la prise en charge de tous les fournisseurs ni de toutes les configurations WooCommerce.
-
-Le code de ce dépôt est **open source, sous [licence MIT](LICENSE)** : vous pouvez l’utiliser, le modifier, le redistribuer et l’intégrer à un projet commercial, en conservant la notice de licence. Les packs privés ne font pas partie de ce dépôt.
-
-Si vous êtes développeur, cette origine fait partie du contexte du projet. Les retours, corrections, améliorations d’architecture et propositions de réécriture sont les bienvenus. Vous souhaitez reprendre tout ou partie de l’outil et le réécrire à la main ? C’est aussi une contribution bienvenue. Le but est de disposer d’un outil utile, compréhensible et durable pour les commerçants.
 
 ## État du projet
 
@@ -256,5 +247,15 @@ Dans **Ma boutique → Importer un CSV d’articles**, sélectionnez un **CSV Wo
 - La colonne Images accepte les URL exactes WordPress ou les noms de fichiers uniques présents dans sa médiathèque. L’outil retrouve les identifiants des médias et les associe sans les télécharger à nouveau. Une image absente ou ambiguë bloque le lot. Une colonne Images vide crée un article sans photo.
 - Toute erreur de contrôle bloque l’ensemble de l’envoi. Les données de l’aperçu sont conservées en mémoire : après modification du CSV, sélectionnez-le à nouveau.
 - Un rapport `rapport_import_*.json` est enregistré à côté du CSV, avec les créations, les articles ignorés et les envois non confirmés. Une erreur de création arrête le lot sans nouvel essai automatique ; vérifiez le rapport et la boutique avant une nouvelle sélection du CSV.
+
+- ## Pourquoi ce projet, et comment il est développé
+
+Je ne suis pas développeur de métier. J’avais des demandes concrètes de commerçants, mais ni les compétences ni le temps nécessaires pour développer seul l’outil de manière classique, et personne de disponible pour le réaliser. J’ai donc choisi de le construire avec l’aide de l’IA, dans une démarche souvent appelée « vibe coding ».
+
+Ce choix m’a permis de transformer un besoin de terrain en une base utilisable. Le code reste un chantier en évolution : il comporte des tests automatisés, mais ceux-ci ne garantissent pas la prise en charge de tous les fournisseurs ni de toutes les configurations WooCommerce.
+
+Le code de ce dépôt est **open source, sous [licence MIT](LICENSE)** : vous pouvez l’utiliser, le modifier, le redistribuer et l’intégrer à un projet commercial, en conservant la notice de licence. Les packs privés ne font pas partie de ce dépôt.
+
+Si vous êtes développeur, cette origine fait partie du contexte du projet. Les retours, corrections, améliorations d’architecture et propositions de réécriture sont les bienvenus. Vous souhaitez reprendre tout ou partie de l’outil et le réécrire à la main ? C’est aussi une contribution bienvenue. Le but est de disposer d’un outil utile, compréhensible et durable pour les commerçants.
 
 Commencez avec un petit lot. Le scénario complet prévu ensuite est : fournir les sources, préparer et envoyer les images, renseigner le CSV avec leurs URL WordPress, attendre la fin des images puis créer les articles. Cette étape teste seulement la dernière partie, avec des images déjà présentes sur le site.
