@@ -4,7 +4,7 @@
 
 Auto Import Stock prépare les fiches produit, les quantités et les images à partir de documents fournisseurs. Le moteur commun est indépendant d’une marque ou d’un secteur : les entrées et les règles métier sont définies par des profils, la destination reste **WooCommerce**.
 
-La V0.10 a établi la base multimarque. La V0.20 ouvre le chantier de connexion à WordPress et WooCommerce, avec une première étape limitée à la configuration et au test des accès. Elle peut être adaptée à la maroquinerie, au vêtement ou à d’autres commerces, en ajoutant les profils et traitements nécessaires.
+La V0.10 a établi la base multimarque. La V0.20 ouvre le chantier de connexion à WordPress et WooCommerce, avec la configuration des accès et un premier test d’envoi d’image dans la médiathèque. Elle peut être adaptée à la maroquinerie, au vêtement ou à d’autres commerces, en ajoutant les profils et traitements nécessaires.
 
 > Le dépôt public contient le moteur, les interfaces et des données fictives. Les profils réels, les règles commerciales, les liens fournisseurs et les adaptateurs spécifiques sont distribués séparément dans un **pack privé**.
 
@@ -191,7 +191,7 @@ python3 -m venv .venv
 
 Sous Windows, remplacer `.venv/bin/python` par `.venv\Scripts\python.exe`. Les tests graphiques sont ignorés si aucun écran n’est disponible. Les tests propres à un pack restent avec ce pack.
 
-L’installation Windows complète, les traitements OCR réels et l’import dans une boutique WooCommerce doivent être vérifiés dans leurs environnements cibles. Le projet prépare des fichiers : il ne publie pas directement dans WordPress et n’effectue pas de synchronisation automatique par API.
+L’installation Windows complète, les traitements OCR réels et l’import dans une boutique WooCommerce doivent être vérifiés dans leurs environnements cibles. Le projet prépare les fichiers produits et permet un test d’envoi d’image dans WordPress. Il ne publie pas encore de produits et n’effectue pas de synchronisation automatique.
 
 ## Connexion à la boutique · V0.20
 
@@ -207,6 +207,16 @@ L’adresse et l’identifiant peuvent être mémorisés dans `~/.config/auto-im
 
 Utilisez l’adresse définitive du site (avec son sous-dossier éventuel), sans `/wp-admin` ni `/wp-json`. HTTPS et un certificat valide sont requis ; les redirections sont refusées pour protéger les identifiants. Cette première version cible les installations WordPress/WooCommerce exposant les API standard `/wp-json/`.
 
-L’envoi des images, la création des produits et les mises à jour feront l’objet des étapes suivantes. L’export CSV actuel reste disponible.
+L’envoi des images par lots, la création des produits et les mises à jour feront l’objet des étapes suivantes. L’export CSV actuel reste disponible.
 
 Références : [clés WooCommerce](https://woocommerce.com/document/woocommerce-rest-api/) et [mots de passe d’application WordPress](https://developer.wordpress.org/advanced-administration/security/application-passwords/).
+
+### Tester l’envoi d’une image
+
+Dans **Ma boutique**, choisissez une image puis cliquez sur **Envoyer l’image sur ce site**. Cette action crée réellement un média WordPress, sans créer de produit. Formats : JPEG, PNG, WebP ; maximum local de 20 Mo, soumis également à la limite du serveur. Le fichier est envoyé tel quel, sans conversion. L’identifiant et l’URL retournés permettent de vérifier le résultat dans la médiathèque.
+
+Chaque nouvel envoi crée un média : cette étape ne détecte pas encore les doublons. En cas d’envoi non confirmé, vérifiez la médiathèque avant de réessayer. Aucun nouvel essai automatique n’est effectué.
+
+### Évolution conservée pour plus tard
+
+Prévoir des connecteurs vers les API de données et d’images des fournisseurs, distincts des profils de transformation. Les développer à partir de cas réels ; ce chantier est différé au profit de l’import WordPress/WooCommerce.

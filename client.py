@@ -240,6 +240,9 @@ class Client(tk.Tk):
    self.after_cancel(timer);self.poll_timer=None
   super().destroy()
  def close(self):
+  dialog=getattr(self,'shop_dialog',None)
+  if dialog is not None and dialog.winfo_exists() and dialog.busy:
+   dialog.lift();dialog.status.set('Attendez le résultat de l’opération avant de fermer l’application.');return
   if self.proc and self.proc.poll() is None:
    if not messagebox.askyesno('Arrêter','Arrêter le traitement et fermer ? Les fichiers terminés seront conservés.'):return
    self.stop()

@@ -2,7 +2,7 @@
 import queue
 import threading
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog
 from core.shop_connection import Credentials, ConnectionFailure, check_connection, load_settings, save_settings
 
 
@@ -10,7 +10,7 @@ class ShopDialog(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.title('Ma boutique · V0.20')
-        self.geometry('740x650')
+        self.geometry('780x820')
         self.transient(parent)
         self.parent = parent
         self.events = queue.Queue()
@@ -43,6 +43,49 @@ class ShopDialog(tk.Toplevel):
         self.status = tk.StringVar(value='Le test consulte les API. Aucun produit ni média ne sera envoyé.')
         ttk.Label(box, textvariable=self.status, wraplength=680).grid(row=10, column=0, columnspan=2, sticky='w', pady=10)
 
+        ttk.Separator(box).grid(row=11, column=0, columnspan=2, sticky='ew', pady=10)
+        ttk.Label(box, text='Test d’import d’une image', font=('Arial', 13, 'bold')).grid(row=12, column=0, columnspan=2, sticky='w')
+        ttk.Label(box, text='Crée réellement un média sur le site indiqué ci-dessus. Aucun produit ne sera créé. JPEG, PNG ou WebP, 20 Mo maximum. Chaque nouvel envoi crée un média.', wraplength=700).grid(row=13, column=0, columnspan=2, sticky='w', pady=8)
+        self.image_label = tk.StringVar(value='Aucune image sélectionnée')
+        ttk.Label(box, textvariable=self.image_label, wraplength=700).grid(row=14, column=0, columnspan=2, sticky='w')
+        self.choose_button = ttk.Button(box, text='Choisir une image…', command=self.choose_image)
+        self.choose_button.grid(row=15, column=0, sticky='w', pady=8)
+        self.upload_button = ttk.Button(box, text='Envoyer l’image sur ce site', command=self.send_image, state='disabled')
+        self.upload_button.grid(row=15, column=1, sticky='w', pady=8)
+
+    def choose_image(self):
+        filename = filedialog.askopenfilename(parent=self, title='Choisir une image à envoyer', filetypes=[('Images', '*.jpg *.jpeg *.png *.webp')])
+        if filename:
+            self.image_path = filename
+            self.image_label.set(filename)
+            self.upload_button.configure(state='normal')
+
+    def send_image(self):
+        if self.busy or not getattr(self, 'image_path', None):
+            return
+        from core.shop_media import upload_image
+        credentials = Credentials(**{key: value.get() for key, value in self.values.items()})
+        filename = self.image_path
+        self.busy = True
+        self.set_controls('disabled')
+        self.status.set('Envoi de l’image dans la médiathèque WordPress…')
+        def worker():
+            try:
+                result = upload_image(credentials, filename)
+                self.events.put({'image': {'ok': True, 'message': f"Image créée dans la médiathèque (ID {result['id']}).\n{result['url']}"}})
+            except ConnectionFailure as exc:
+                self.events.put({'image': {'ok': False, 'message': str(exc)}})
+            except Exception:
+                self.events.put({'image': {'ok': False, 'message': 'Envoi non confirmé. Vérifiez la médiathèque avant de réessayer.'}})
+        threading.Thread(target=worker, daemon=True).start()
+        self.timer = self.after(100, self.poll)
+
+    def set_controls(self, state):
+        for widget in [self.button, self.remember_button, self.choose_button, self.upload_button, *self.entries]:
+            widget.configure(state=state)
+        if state == 'normal' and not getattr(self, 'image_path', None):
+            self.upload_button.configure(state='disabled')
+
     def start(self):
         if self.busy:
             return
@@ -59,8 +102,7 @@ class ShopDialog(tk.Toplevel):
                 self.status.set('Impossible de mémoriser l’adresse sur ce poste. Décochez la mémorisation pour tester sans enregistrer.')
                 return
         self.busy = True
-        for widget in [self.button, self.remember_button, *self.entries]:
-            widget.configure(state='disabled')
+        self.set_controls('disabled')
         self.status.set('Vérification en cours…')
         def worker():
             try:
@@ -78,8 +120,10 @@ class ShopDialog(tk.Toplevel):
             self.timer = self.after(100, self.poll)
             return
         self.busy = False
-        for widget in [self.button, self.remember_button, *self.entries]:
-            widget.configure(state='normal')
+        self.set_controls('normal')
+        if 'image' in result:
+            self.image_path = None
+            self.upload_button.configure(state='disabled')
         self.status.set('\n\n'.join(f"{name.title()} — {'OK' if item['ok'] else 'Échec'} : {item['message']}" for name, item in result.items()))
 
     def destroy(self):
@@ -88,4 +132,6 @@ class ShopDialog(tk.Toplevel):
         super().destroy()
 
     def close(self):
+        if self.busy:
+            self.status.set('Opération en cours. Attendez le résultat avant de fermer cette fenêtre.');return
         self.destroy()
