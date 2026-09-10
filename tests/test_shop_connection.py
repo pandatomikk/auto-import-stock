@@ -59,6 +59,21 @@ class ConnectionTests(unittest.TestCase):
             self.assertEqual(load_settings(path).url, '')
         self.assertNotIn('cs_test', repr(self.credentials))
 
+    def test_saved_credentials_survive_restart_and_can_be_removed(self):
+        import os
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'shop.json'
+            save_settings(self.credentials, path, remember_secrets=True)
+            restored = load_settings(path)
+            self.assertEqual(restored.application_password, self.credentials.application_password)
+            self.assertEqual(restored.consumer_secret, self.credentials.consumer_secret)
+            if os.name != 'nt':
+                self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            save_settings(restored, path, remember_secrets=False)
+            self.assertEqual(load_settings(path).consumer_secret, '')
+            self.assertNotIn('application_password', json.loads(path.read_text()))
+            self.assertEqual(list(Path(folder).glob('.shop-*')), [])
+
     @patch('core.shop_connection.build_opener')
     def test_transport_is_get_and_header_auth(self, opener):
         opener.return_value.open.return_value.__enter__.return_value.read.return_value = b'[]'
@@ -97,7 +112,7 @@ class ShopDialogTests(unittest.TestCase):
         root.withdraw()
         root.shop_credentials = Credentials('https://shop.example', 'operator', 'app-pass', 'ck_test', 'cs_test')
         try:
-            with patch('core.shop_ui.check_connection', return_value={'wordpress': {'ok': True, 'message': 'Test OK'}, 'woocommerce': {'ok': False, 'message': 'Accès refusé'}}):
+            with patch('core.shop_ui.save_settings'), patch('core.shop_ui.check_connection', return_value={'wordpress': {'ok': True, 'message': 'Test OK'}, 'woocommerce': {'ok': False, 'message': 'Accès refusé'}}):
                 dialog = ShopDialog(root)
                 dialog.withdraw()
                 dialog.remember.set(False)

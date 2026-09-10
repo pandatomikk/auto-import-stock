@@ -35,11 +35,13 @@ class ShopDialog(tk.Toplevel):
         instructions = 'WordPress : Utilisateurs → Profil → Mots de passe d’application.\nWooCommerce : Réglages → Avancé → API REST → Ajouter une clé (Lecture/Écriture).\nUtilisez l’adresse de la boutique, y compris son sous-dossier éventuel.'
         ttk.Label(box, text=instructions, wraplength=680).grid(row=6, column=0, columnspan=2, sticky='w', pady=16)
         self.remember = tk.BooleanVar(value=True)
-        self.remember_button = ttk.Checkbutton(box, text='Mémoriser l’adresse et l’identifiant sur ce poste', variable=self.remember)
+        self.remember_button = ttk.Checkbutton(box, text='Mémoriser les accès sur ce poste (mot de passe et clés inclus)', variable=self.remember)
         self.remember_button.grid(row=7, column=0, columnspan=2, sticky='w')
-        ttk.Label(box, text='Les clés et le mot de passe restent en mémoire jusqu’à la fermeture de l’application. Ils devront être saisis au prochain lancement.', wraplength=680).grid(row=8, column=0, columnspan=2, sticky='w', pady=8)
+        ttk.Label(box, text='Fichier local non chiffré, hors GitHub, conservé lors des mises à jour. Décochez puis enregistrez pour retirer les secrets du fichier.', wraplength=680).grid(row=8, column=0, columnspan=2, sticky='w', pady=8)
         self.button = ttk.Button(box, text='Tester la connexion', command=self.start)
-        self.button.grid(row=9, column=0, columnspan=2, sticky='w', pady=10)
+        self.button.grid(row=9, column=0, sticky='w', pady=10)
+        self.save_button = ttk.Button(box, text='Enregistrer les accès', command=self.persist)
+        self.save_button.grid(row=9, column=1, sticky='w', pady=10)
         self.status = tk.StringVar(value='Le test consulte les API. Aucun produit ni média ne sera envoyé.')
         ttk.Label(box, textvariable=self.status, wraplength=680).grid(row=10, column=0, columnspan=2, sticky='w', pady=10)
 
@@ -52,6 +54,17 @@ class ShopDialog(tk.Toplevel):
         self.choose_button.grid(row=15, column=0, sticky='w', pady=8)
         self.upload_button = ttk.Button(box, text='Envoyer l’image sur ce site', command=self.send_image, state='disabled')
         self.upload_button.grid(row=15, column=1, sticky='w', pady=8)
+
+    def persist(self):
+        try:
+            credentials = Credentials(**{key: value.get() for key, value in self.values.items()})
+            save_settings(credentials, remember_secrets=self.remember.get())
+        except (ConnectionFailure, OSError):
+            self.status.set('Enregistrement impossible : vérifiez l’adresse HTTPS et les droits du dossier de configuration.')
+            return False
+        self.parent.shop_credentials = credentials
+        self.status.set('Accès enregistrés sur ce poste.' if self.remember.get() else 'Secrets retirés du fichier local ; ils restent disponibles pour cette session.')
+        return True
 
     def choose_image(self):
         filename = filedialog.askopenfilename(parent=self, title='Choisir une image à envoyer', filetypes=[('Images', '*.jpg *.jpeg *.png *.webp')])
@@ -81,7 +94,7 @@ class ShopDialog(tk.Toplevel):
         self.timer = self.after(100, self.poll)
 
     def set_controls(self, state):
-        for widget in [self.button, self.remember_button, self.choose_button, self.upload_button, *self.entries]:
+        for widget in [self.button, self.save_button, self.remember_button, self.choose_button, self.upload_button, *self.entries]:
             widget.configure(state=state)
         if state == 'normal' and not getattr(self, 'image_path', None):
             self.upload_button.configure(state='disabled')
@@ -95,12 +108,8 @@ class ShopDialog(tk.Toplevel):
             self.status.set(str(exc))
             return
         self.parent.shop_credentials = credentials
-        if self.remember.get():
-            try:
-                save_settings(credentials)
-            except OSError:
-                self.status.set('Impossible de mémoriser l’adresse sur ce poste. Décochez la mémorisation pour tester sans enregistrer.')
-                return
+        if not self.persist():
+            return
         self.busy = True
         self.set_controls('disabled')
         self.status.set('Vérification en cours…')

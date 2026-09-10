@@ -1,9 +1,10 @@
-"""Read-only WordPress/WooCommerce connection checks. Never persist secrets."""
+"""Read-only WordPress/WooCommerce connection checks. Optional local credential persistence, outside the application checkout."""
 from dataclasses import dataclass, field
 import base64
 import json
 import os
 from pathlib import Path
+import tempfile
 import socket
 import ssl
 from urllib.error import HTTPError, URLError
@@ -109,13 +110,17 @@ def settings_path():
     return base / 'auto-import-stock' / 'shop.json'
 
 
-def save_settings(credentials, path=None):
+def save_settings(credentials, path=None, *, remember_secrets=False):
     path = Path(path) if path else settings_path()
     data = {'url': normalize_url(credentials.url), 'username': credentials.username.strip()}
+    if remember_secrets:
+        data.update({name: getattr(credentials, name) for name in ('application_password', 'consumer_key', 'consumer_secret')})
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix('.tmp')
+    # mkstemp creates mode 0600 from the outset; replacement is atomic.
+    descriptor, name = tempfile.mkstemp(prefix='.shop-', suffix='.tmp', dir=path.parent)
+    temporary = Path(name)
     try:
-        with temporary.open('w', encoding='utf-8') as stream:
+        with os.fdopen(descriptor, 'w', encoding='utf-8') as stream:
             json.dump(data, stream, ensure_ascii=False, indent=2)
         temporary.replace(path)
     finally:
@@ -126,6 +131,6 @@ def load_settings(path=None):
     path = Path(path) if path else settings_path()
     try:
         data = json.loads(path.read_text(encoding='utf-8'))
-        return Credentials(url=normalize_url(data.get('url', '')), username=str(data.get('username', '')))
+        return Credentials(url=normalize_url(data.get('url', '')), **{name: str(data.get(name, '')) for name in ('username', 'application_password', 'consumer_key', 'consumer_secret')})
     except (OSError, ValueError, AttributeError, TypeError):
         return Credentials()

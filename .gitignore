@@ -42,3 +42,9 @@ Thumbs.db
 diagnostic_*.txt
 runtime_windows.json
 /tessdata/
+
+# Local connection credentials (also excluded if copied into the checkout)
+.env
+.env.*
+shop.json
+.shop-*.tmp
