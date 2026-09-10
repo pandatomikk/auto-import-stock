@@ -1,10 +1,30 @@
 # Auto Import Stock · V0.20
 
-**Une base multimarque pour transformer les données fournisseurs en catalogues WooCommerce.**
+**Moins de saisie, plus de temps pour votre commerce : préparez et ajoutez vos produits sur WooCommerce à partir des fichiers de vos fournisseurs.**
 
-Auto Import Stock prépare les fiches produit, les quantités et les images à partir de documents fournisseurs. Le moteur commun est indépendant d’une marque ou d’un secteur : les entrées et les règles métier sont définies par des profils, la destination reste **WooCommerce**.
+Vous recevez un catalogue Excel, une facture ou un dossier de photos et devez tout reprendre pour votre boutique en ligne ? Auto Import Stock est né de ce besoin : simplifier la préparation des fiches produit, des quantités et des images, puis leur mise en ligne sur **WooCommerce**.
 
-La V0.10 a établi la base multimarque. La V0.20 ouvre le chantier de connexion à WordPress et WooCommerce, avec la configuration des accès et un premier test d’envoi d’image dans la médiathèque. Elle peut être adaptée à la maroquinerie, au vêtement ou à d’autres commerces, en ajoutant les profils et traitements nécessaires.
+L’outil s’adresse aux commerçants qui souhaitent réduire les manipulations répétitives. Il propose plusieurs parcours selon les documents disponibles et peut être adapté à différents fournisseurs et secteurs. Certaines adaptations nécessitent un profil ou un traitement spécifique : il ne reconnaît pas encore automatiquement tous les formats.
+
+## Besoin d’un accompagnement ?
+
+Je peux vous accompagner dans la mise en place de votre boutique WooCommerce, son déploiement, l’installation de cet outil et son adaptation à vos fichiers fournisseurs. L’objectif est de construire un fonctionnement adapté à votre commerce et de vous aider à le prendre en main.
+
+**Pour présenter votre projet ou échanger sur vos besoins : [ZPSI — zpsi.fr](https://zpsi.fr).**
+
+## Pourquoi ce projet, et comment il est développé
+
+Je ne suis pas développeur de métier. J’avais des demandes concrètes de commerçants, mais ni les compétences ni le temps nécessaires pour développer seul l’outil de manière classique, et personne de disponible pour le réaliser. J’ai donc choisi de le construire avec l’aide de l’IA, dans une démarche souvent appelée « vibe coding ».
+
+Ce choix m’a permis de transformer un besoin de terrain en une base utilisable. Le code reste un chantier en évolution : il comporte des tests automatisés, mais ceux-ci ne garantissent pas la prise en charge de tous les fournisseurs ni de toutes les configurations WooCommerce.
+
+Le code de ce dépôt est **open source, sous [licence MIT](LICENSE)** : vous pouvez l’utiliser, le modifier, le redistribuer et l’intégrer à un projet commercial, en conservant la notice de licence. Les packs privés ne font pas partie de ce dépôt.
+
+Si vous êtes développeur, cette origine fait partie du contexte du projet. Les retours, corrections, améliorations d’architecture et propositions de réécriture sont les bienvenus. Vous souhaitez reprendre tout ou partie de l’outil et le réécrire à la main ? C’est aussi une contribution bienvenue. Le but est de disposer d’un outil utile, compréhensible et durable pour les commerçants.
+
+## État du projet
+
+La V0.10 a établi la base multimarque. La V0.20 ouvre le chantier de connexion à WordPress et WooCommerce, avec la configuration des accès, l’envoi d’une image dans la médiathèque et la création d’articles depuis un CSV WooCommerce. Elle peut être adaptée à la maroquinerie, au vêtement ou à d’autres commerces, en ajoutant les profils et traitements nécessaires.
 
 > Le dépôt public contient le moteur, les interfaces et des données fictives. Les profils réels, les règles commerciales, les liens fournisseurs et les adaptateurs spécifiques sont distribués séparément dans un **pack privé**.
 
@@ -191,7 +211,7 @@ python3 -m venv .venv
 
 Sous Windows, remplacer `.venv/bin/python` par `.venv\Scripts\python.exe`. Les tests graphiques sont ignorés si aucun écran n’est disponible. Les tests propres à un pack restent avec ce pack.
 
-L’installation Windows complète, les traitements OCR réels et l’import dans une boutique WooCommerce doivent être vérifiés dans leurs environnements cibles. Le projet prépare les fichiers produits et permet un test d’envoi d’image dans WordPress. Il ne publie pas encore de produits et n’effectue pas de synchronisation automatique.
+L’installation Windows complète, les traitements OCR réels et l’import dans une boutique WooCommerce doivent être vérifiés dans leurs environnements cibles. Le projet prépare les fichiers produits et permet un test d’envoi d’image dans WordPress. Il peut créer des produits publiés depuis un CSV contrôlé ; il ne met jamais à jour les produits existants et n’effectue pas encore le parcours complet automatiquement.
 
 ## Connexion à la boutique · V0.20
 
@@ -211,7 +231,7 @@ Décochez la mémorisation puis enregistrez pour supprimer le fichier chiffré. 
 
 Utilisez l’adresse définitive du site (avec son sous-dossier éventuel), sans `/wp-admin` ni `/wp-json`. HTTPS et un certificat valide sont requis ; les redirections sont refusées pour protéger les identifiants. Cette première version cible les installations WordPress/WooCommerce exposant les API standard `/wp-json/`.
 
-L’envoi des images par lots, la création des produits et les mises à jour feront l’objet des étapes suivantes. L’export CSV actuel reste disponible.
+L’envoi des images par lots et l’enchaînement automatique sources → images WordPress → CSV → création des articles feront l’objet des étapes suivantes. Les mises à jour de produits restent hors du périmètre actuel. L’export CSV actuel reste disponible.
 
 Références : [clés WooCommerce](https://woocommerce.com/document/woocommerce-rest-api/) et [mots de passe d’application WordPress](https://developer.wordpress.org/advanced-administration/security/application-passwords/).
 
@@ -224,3 +244,17 @@ Chaque nouvel envoi crée un média : cette étape ne détecte pas encore les do
 ### Évolution conservée pour plus tard
 
 Prévoir des connecteurs vers les API de données et d’images des fournisseurs, distincts des profils de transformation. Les développer à partir de cas réels ; ce chantier est différé au profit de l’import WordPress/WooCommerce.
+
+### Tester la création d’articles depuis un CSV
+
+Dans **Ma boutique → Importer un CSV d’articles**, sélectionnez un **CSV WooCommerce UTF-8 avec les colonnes françaises de l’outil**. Les séparateurs virgule, point-virgule et tabulation sont détectés. Le contrôle est en lecture seule : il affiche les nouveaux articles, les UGS existantes à ignorer et les erreurs. Cliquez ensuite sur **Créer et publier les … nouveaux articles** pour effectuer l’envoi réel. Le fichier est lu localement puis traduit en requêtes JSON de création, conformément à l’[API produits WooCommerce](https://developer.woocommerce.com/docs/apis/rest-api/v3/products/).
+
+- Produits simples uniquement, avec UGS et nom obligatoires, ID vide et statut publié. Aucune mise à jour ni suppression.
+- Les UGS déjà présentes sont ignorées, avec un second contrôle immédiatement avant chaque création. Les UGS en double dans le CSV bloquent l’envoi.
+- Les prix, stocks, descriptions, EAN, dimensions, catégories, marques, étiquettes et attributs sont repris lorsqu’ils sont renseignés. Les colonnes non prises en charge mais renseignées bloquent le lot, plutôt que d’être omises silencieusement. Les unités de poids et dimensions de la boutique doivent correspondre au CSV.
+- Les catégories (y compris `Parent > Enfant`), marques, étiquettes et attributs globaux doivent déjà exister dans la boutique. Ce test ne crée pas ces référentiels.
+- La colonne Images accepte les URL exactes WordPress ou les noms de fichiers uniques présents dans sa médiathèque. L’outil retrouve les identifiants des médias et les associe sans les télécharger à nouveau. Une image absente ou ambiguë bloque le lot. Une colonne Images vide crée un article sans photo.
+- Toute erreur de contrôle bloque l’ensemble de l’envoi. Les données de l’aperçu sont conservées en mémoire : après modification du CSV, sélectionnez-le à nouveau.
+- Un rapport `rapport_import_*.json` est enregistré à côté du CSV, avec les créations, les articles ignorés et les envois non confirmés. Une erreur de création arrête le lot sans nouvel essai automatique ; vérifiez le rapport et la boutique avant une nouvelle sélection du CSV.
+
+Commencez avec un petit lot. Le scénario complet prévu ensuite est : fournir les sources, préparer et envoyer les images, renseigner le CSV avec leurs URL WordPress, attendre la fin des images puis créer les articles. Cette étape teste seulement la dernière partie, avec des images déjà présentes sur le site.

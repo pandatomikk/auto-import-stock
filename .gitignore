@@ -52,3 +52,5 @@ shop.json
 secrets/
 *.enc
 .vault-*
+
+rapport_import_*.json

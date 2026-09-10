@@ -5,7 +5,7 @@ from pathlib import Path
 def copy_application(source, target):
     source, target = Path(source), Path(target)
     target.mkdir(parents=True, exist_ok=True)
-    for name in ['client.py', 'lancer.py', 'convertisseur.py', 'requirements.txt', 'README.md', 'core', 'schemas', 'profiles']:
+    for name in ['client.py', 'lancer.py', 'convertisseur.py', 'requirements.txt', 'README.md', 'LICENSE', 'core', 'schemas', 'profiles']:
         src, dst = source / name, target / name
         if src.is_dir():
             for file in src.rglob('*'):

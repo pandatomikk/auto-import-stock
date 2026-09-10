@@ -60,6 +60,19 @@ class ShopDialog(tk.Toplevel):
         self.upload_button = ttk.Button(box, text='Envoyer l’image sur ce site', command=self.send_image, state='disabled')
         self.upload_button.grid(row=15, column=1, sticky='w', pady=8)
 
+        self.csv_button = ttk.Button(box, text='Importer un CSV d’articles…', command=self.open_products)
+        self.csv_button.grid(row=16, column=0, columnspan=2, sticky='w', pady=10)
+
+    def open_products(self):
+        if self.busy:
+            return
+        from core.shop_products_ui import ProductsDialog
+        credentials = Credentials(**{key: value.get() for key, value in self.values.items()})
+        try:
+            self.products_dialog = ProductsDialog(self, credentials)
+        except ConnectionFailure as exc:
+            self.status.set(str(exc))
+
     def persist(self):
         try:
             credentials = Credentials(**{key: value.get() for key, value in self.values.items()})
@@ -101,7 +114,7 @@ class ShopDialog(tk.Toplevel):
         self.timer = self.after(100, self.poll)
 
     def set_controls(self, state):
-        for widget in [self.button, self.save_button, self.remember_button, self.choose_button, self.upload_button, *self.entries]:
+        for widget in [self.button, self.save_button, self.remember_button, self.choose_button, self.upload_button, self.csv_button, *self.entries]:
             widget.configure(state=state)
         if state == 'normal' and not getattr(self, 'image_path', None):
             self.upload_button.configure(state='disabled')
