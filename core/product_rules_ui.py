@@ -28,7 +28,7 @@ class ProductRulesDialog(tk.Toplevel):
         for row, (label, variable) in enumerate([('Champ du modèle (name ou model)', self.model_field), ('Format du nom', self.name_template), ('Catégorie proposée', self.category_template)]):
             ttk.Label(fields, text=label).grid(row=row, column=0, sticky='w', padx=8)
             ttk.Entry(fields, textvariable=variable, width=55).grid(row=row, column=1, sticky='ew')
-        ttk.Label(box, text='Formats disponibles : {model} et {color} pour le nom ; {model} pour la catégorie. Rechargez les groupes après changement du champ modèle.', wraplength=860).pack(anchor='w')
+        ttk.Label(box, text='Nom : {model}, {model_upper}, {color}, {color_compact}, {color_compact_initial_lower}. Catégorie : {model}. Rechargez les groupes après changement du champ modèle.', wraplength=860).pack(anchor='w')
         ttk.Button(box, text='Charger les modèles et couleurs du document', command=self.populate).pack(anchor='w', pady=8)
         notebook = ttk.Notebook(box); notebook.pack(fill='both', expand=True)
         self.tables = {}; self.edits = {}
@@ -56,7 +56,7 @@ class ProductRulesDialog(tk.Toplevel):
 
     def templates(self):
         self.rules.update(enabled=self.enabled.get(), model_field=self.model_field.get().strip(), name_template=self.name_template.get(), category_template=self.category_template.get())
-        self.rules['name_template'].format(model='Modèle', color='Couleur')
+        self.rules['name_template'].format(model='Modèle', model_upper='MODÈLE', color='Couleur', color_compact='Couleur', color_compact_initial_lower='couleur')
         self.rules['category_template'].format(model='Modèle')
 
     def populate(self):

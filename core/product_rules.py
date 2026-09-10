@@ -62,5 +62,8 @@ def display_values(values, rules):
         raise ValueError('Modèle commercial absent : vérifiez le champ modèle dans Règles produits.')
     color = color or ''
     category = override.get('category') or rules.get('category_template', '{model}').format(model=model)
-    title = rules.get('name_template', '{model} — {color}').format(model=model, color=color).strip(' —-')
+    color_parts = [part.strip() for part in color.split('/')]
+    compact_color = '/'.join(color_parts)
+    compact_initial_lower = '/'.join([color_parts[0].lower(), *color_parts[1:]])
+    title = rules.get('name_template', '{model} — {color}').format(model=model, model_upper=model.upper(), color=color, color_compact=compact_color, color_compact_initial_lower=compact_initial_lower).strip(' —-')
     return {'model': model, 'color': color, 'category': category, 'title': title, 'raw_model': raw_model, 'raw_color': raw_color}

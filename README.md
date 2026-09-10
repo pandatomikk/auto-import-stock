@@ -287,3 +287,5 @@ Les règles sont enregistrées par fournisseur et par boutique configurée, dans
 Après enregistrement des règles, relancez la préparation. Pour un parcours en deux étapes déjà en pause, la précédente préparation est sauvegardée dans `sauvegarde_preparation_*` avant son remplacement. Le ZIP d’images pourra ensuite être utilisé pour finaliser le nouveau CSV. Les produits déjà présents sur la boutique restent ignorés par l’import en ajout uniquement.
 
 En ligne de commande : `--product-rules /chemin/regles.json` applique les règles et `--rebuild-preparation` recrée explicitement une préparation en attente avec sauvegarde de l’ancienne.
+
+Le format du nom accepte aussi `{model_upper}` pour le modèle en majuscules, `{color_compact}` pour des couleurs séparées par `/` sans espaces, et `{color_compact_initial_lower}` pour mettre la première couleur en minuscules tout en conservant les suivantes. Ces formats ne changent pas le nom de la catégorie.
