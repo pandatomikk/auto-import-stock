@@ -13,7 +13,7 @@ if os.name=='nt' and (ROOT/'runtime_windows.json').is_file():
 
 class Client(tk.Tk):
  def __init__(self):
-  super().__init__();self.title('Import fournisseurs — ZPSI');self.geometry('960x720');self.minsize(820,680);self.configure(bg='#f4f1f7')
+  super().__init__();self.title('Import fournisseurs — ZPSI · V0.20');self.geometry('960x720');self.minsize(820,680);self.configure(bg='#f4f1f7')
   self.configs={p.stem:read_profile(p) for p in discover_profiles()}
   default=next((key for key,value in self.configs.items() if value.get('default')),next(iter(self.configs),''))
   self.image_values={}
@@ -33,6 +33,7 @@ class Client(tk.Tk):
   style.configure('TCheckbutton',padding=6,background='white')
   style.configure('Horizontal.TProgressbar',background='#80509a',troughcolor='#eee8f3',borderwidth=0)
   header=tk.Frame(self,bg='#3c1648',height=120);header.pack(fill='x');header.pack_propagate(False)
+  ttk.Button(header,text='Ma boutique',command=self.open_shop).pack(side='right',padx=24)
   tk.Label(header,text='ZPSI  /  CATALOGUE',bg='#3c1648',fg='#f4c95d',font=('Arial',10,'bold')).pack(anchor='w',padx=32,pady=(18,5))
   tk.Label(header,text='Vos produits, prêts pour la boutique.',bg='#3c1648',fg='white',font=('Arial',23,'bold')).pack(anchor='w',padx=32)
   tk.Label(header,text='Une facture, des images. On prépare le reste.',bg='#3c1648',fg='#ddcde5',font=('Arial',11)).pack(anchor='w',padx=32,pady=5)
@@ -63,6 +64,11 @@ class Client(tk.Tk):
   ttk.Label(box,text='Vos fichiers restent sur cet ordinateur. Vous choisissez quand les importer dans la boutique.',foreground='#84768a',wraplength=800,font=('Arial',10)).grid(row=10,column=0,columnspan=3,sticky='w',pady=(22,0))
   self.source.trace_add('write',self.selection_changed)
   self.protocol('WM_DELETE_WINDOW',self.close);self.brand_changed();self.poll_timer=self.after(150,self.poll)
+ def open_shop(self):
+  from core.shop_ui import ShopDialog
+  if getattr(self,'shop_dialog',None) is not None and self.shop_dialog.winfo_exists():
+   self.shop_dialog.lift();return
+  self.shop_dialog=ShopDialog(self)
  def field(self,box,row,label,var,command=None):
   ttk.Label(box,text=label).grid(row=row,column=0,sticky='w',padx=(0,12),pady=5)
   w=ttk.Entry(box,textvariable=var);w.grid(row=row,column=1,sticky='ew');self.inputs.append(w)

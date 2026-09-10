@@ -1,10 +1,10 @@
-# Auto Import Stock · V0.10
+# Auto Import Stock · V0.20
 
 **Une base multimarque pour transformer les données fournisseurs en catalogues WooCommerce.**
 
 Auto Import Stock prépare les fiches produit, les quantités et les images à partir de documents fournisseurs. Le moteur commun est indépendant d’une marque ou d’un secteur : les entrées et les règles métier sont définies par des profils, la destination reste **WooCommerce**.
 
-Cette V0.10 est la base de travail du projet. Elle peut être adaptée à la maroquinerie, au vêtement ou à d’autres commerces, en ajoutant les profils et traitements nécessaires.
+La V0.10 a établi la base multimarque. La V0.20 ouvre le chantier de connexion à WordPress et WooCommerce, avec une première étape limitée à la configuration et au test des accès. Elle peut être adaptée à la maroquinerie, au vêtement ou à d’autres commerces, en ajoutant les profils et traitements nécessaires.
 
 > Le dépôt public contient le moteur, les interfaces et des données fictives. Les profils réels, les règles commerciales, les liens fournisseurs et les adaptateurs spécifiques sont distribués séparément dans un **pack privé**.
 
@@ -173,6 +173,8 @@ core/
   normalization.py         Normalisation des libellés
   media_workflow.py        Préparation persistante en deux étapes
   images.py                Traitement des ZIP par identifiant
+  shop_connection.py       Authentification et tests API en lecture seule
+  shop_ui.py               Configuration de la boutique
   image_webp.py            Conversion des images
   enrichment.py            Interface d’enrichissement optionnel
   shared.py                Validations et écriture JSON
@@ -190,3 +192,21 @@ python3 -m venv .venv
 Sous Windows, remplacer `.venv/bin/python` par `.venv\Scripts\python.exe`. Les tests graphiques sont ignorés si aucun écran n’est disponible. Les tests propres à un pack restent avec ce pack.
 
 L’installation Windows complète, les traitements OCR réels et l’import dans une boutique WooCommerce doivent être vérifiés dans leurs environnements cibles. Le projet prépare des fichiers : il ne publie pas directement dans WordPress et n’effectue pas de synchronisation automatique par API.
+
+## Connexion à la boutique · V0.20
+
+Dans le client, cliquez sur **Ma boutique**. Renseignez l’adresse HTTPS du site, votre identifiant WordPress, un mot de passe d’application WordPress, ainsi que la clé client et le secret WooCommerce.
+
+- WordPress : **Utilisateurs → Profil → Mots de passe d’application**. Le compte doit disposer des droits nécessaires pour les futurs envois de médias.
+- WooCommerce : **Réglages → Avancé → API REST → Ajouter une clé**, avec accès **Lecture/Écriture** pour la suite du chantier.
+- Cliquez sur **Tester la connexion**. Les résultats WordPress et WooCommerce sont séparés : l’un peut réussir tandis que l’autre échoue.
+
+Le test authentifie l’utilisateur WordPress et consulte ses capacités, puis lit au maximum un identifiant de produit via WooCommerce. Il ne crée et ne modifie rien. Une lecture réussie ne garantit pas les droits d’écriture des clés WooCommerce ; ceux-ci seront contrôlés lors du chantier d’import.
+
+L’adresse et l’identifiant peuvent être mémorisés dans `~/.config/auto-import-stock/shop.json` (ou `$XDG_CONFIG_HOME/auto-import-stock/shop.json`) sous Linux, et `%LOCALAPPDATA%/auto-import-stock/shop.json` sous Windows. Les secrets restent uniquement en mémoire, y compris en fermant puis rouvrant la fenêtre Ma boutique, jusqu’à la fermeture de l’application. Ils ne sont ni enregistrés ni inclus dans le dépôt.
+
+Utilisez l’adresse définitive du site (avec son sous-dossier éventuel), sans `/wp-admin` ni `/wp-json`. HTTPS et un certificat valide sont requis ; les redirections sont refusées pour protéger les identifiants. Cette première version cible les installations WordPress/WooCommerce exposant les API standard `/wp-json/`.
+
+L’envoi des images, la création des produits et les mises à jour feront l’objet des étapes suivantes. L’export CSV actuel reste disponible.
+
+Références : [clés WooCommerce](https://woocommerce.com/document/woocommerce-rest-api/) et [mots de passe d’application WordPress](https://developer.wordpress.org/advanced-administration/security/application-passwords/).
