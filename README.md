@@ -243,7 +243,7 @@ Dans **Ma boutique → Importer un CSV d’articles**, sélectionnez un **CSV Wo
 - Produits simples uniquement, avec UGS et nom obligatoires, ID vide et statut publié. Aucune mise à jour ni suppression.
 - Les UGS déjà présentes sont ignorées, avec un second contrôle immédiatement avant chaque création. Les UGS en double dans le CSV bloquent l’envoi.
 - Les prix, stocks, descriptions, EAN, dimensions, catégories, marques, étiquettes et attributs sont repris lorsqu’ils sont renseignés. Les colonnes non prises en charge mais renseignées bloquent le lot, plutôt que d’être omises silencieusement. Les unités de poids et dimensions de la boutique doivent correspondre au CSV.
-- Les catégories (y compris `Parent > Enfant`), marques, étiquettes et attributs globaux doivent déjà exister dans la boutique. Ce test ne crée pas ces référentiels.
+- Les catégories (y compris `Parent > Enfant`), marques, étiquettes et attributs globaux doivent déjà exister dans la boutique. Les noms de marques et catégories différents du CSV peuvent être associés manuellement aux destinations du site. Ce test ne crée pas ces référentiels.
 - La colonne Images accepte les URL exactes WordPress ou les noms de fichiers uniques présents dans sa médiathèque. L’outil retrouve les identifiants des médias et les associe sans les télécharger à nouveau. Une image absente ou ambiguë bloque le lot. Une colonne Images vide crée un article sans photo.
 - Toute erreur de contrôle bloque l’ensemble de l’envoi. Les données de l’aperçu sont conservées en mémoire : après modification du CSV, sélectionnez-le à nouveau.
 - Un rapport `rapport_import_*.json` est enregistré à côté du CSV, avec les créations, les articles ignorés et les envois non confirmés. Une erreur de création arrête le lot sans nouvel essai automatique ; vérifiez le rapport et la boutique avant une nouvelle sélection du CSV.
@@ -269,3 +269,11 @@ Les boutons de sélection utilisent le sélecteur natif GNOME via Zenity, ou KDE
 Le client affiche l’étape courante (lecture du catalogue, indexation du ZIP, descriptions fournisseur, conversion WebP, écriture des fichiers), la référence en cours et les compteurs disponibles. Le temps écoulé reste visible ; après 15 secondes sans nouvel événement, une indication d’attente apparaît. Elle ne prouve pas un blocage : une opération disque ou réseau peut encore être en cours. **Voir le journal** ouvre le diagnostic du traitement.
 
 Un CSV WooCommerce déjà préparé doit passer par **Ma boutique → Importer un CSV d’articles**. Le moteur de préparation le signale avant d’indexer les photos : utilisez le catalogue fournisseur original pour refaire une préparation.
+
+### Correspondances des marques et catégories
+
+À la sélection du CSV, une fenêtre compare ses libellés de marques et catégories à ceux de la boutique. Elle affiche les correspondances exactes, les choix mémorisés et les suggestions à valider. Par exemple, un nom court dans le CSV peut être associé au nom commercial complet de la boutique.
+
+Sélectionnez une ligne et choisissez sa destination dans la liste. Les catégories sont affichées avec leur chemin complet pour distinguer les noms identiques sous différents parents. Vous pouvez corriger n’importe quelle proposition, même une correspondance exacte. Cliquez sur **Mémoriser et valider ces correspondances** pour poursuivre le contrôle des articles. Une suggestion ne devient jamais une association sans cette validation. Une ligne sans destination bloque la validation.
+
+Les choix sont mémorisés par adresse de boutique dans le dossier local `auto-import-stock/correspondances/`, à côté de `shop.json`, hors GitHub. Ils sont réutilisés lors des prochains imports et restent modifiables avec **Revoir les correspondances…**. Une destination supprimée doit être remplacée manuellement. Les associations utilisées figurent dans le rapport d’import. Le CSV et les noms présents sur la boutique ne sont pas modifiés ; seules les associations des nouveaux articles utilisent les identifiants choisis.

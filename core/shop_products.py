@@ -114,9 +114,11 @@ def read_products_csv(path):
 
 
 class Resolver:
-    def __init__(self, api):
+    def __init__(self, api, mappings=None):
         self.api = api
         self.cache = {}
+        self.mappings = mappings or {}
+        self.used_mappings = []
 
     def all(self, route):
         if route not in self.cache:
@@ -127,6 +129,14 @@ class Resolver:
         terms = self.all('wc/v3/products/' + kind)
         ids = []
         for name in split_values(value):
+            from core.shop_mappings import source_key, term_labels
+            selected = self.mappings.get(kind, {}).get(source_key(name.replace('\\,', ',')))
+            if selected is not None:
+                if selected not in {term['id'] for term in terms}:
+                    raise ConnectionFailure(f'Correspondance {kind} périmée : {name}. Choisissez une autre destination.')
+                ids.append({'id': selected})
+                self.used_mappings.append({'kind': kind, 'source': name, 'id': selected, 'destination': term_labels(kind, terms)[selected]})
+                continue
             parent = 0
             for component in (name.split('>') if kind == 'categories' else [name]):
                 matches = [t for t in terms if html.unescape(t.get('name', '')).casefold() == component.strip().replace('\\,', ',').casefold() and (kind != 'categories' or t.get('parent', 0) == parent)]
@@ -232,9 +242,9 @@ def row_payload(row, resolver):
     return payload
 
 
-def prepare_csv(path, api, progress=lambda text: None):
+def prepare_csv(path, api, progress=lambda text: None, mappings=None):
     rows = read_products_csv(path)
-    resolver = Resolver(api)
+    resolver = Resolver(api, mappings)
     plan = {'site': api.url, 'source': str(Path(path).resolve()), 'items': [], 'errors': []}
     seen = set()
     for index, row in rows:
@@ -253,13 +263,14 @@ def prepare_csv(path, api, progress=lambda text: None):
             plan['items'].append({'line': index, 'sku': sku, 'name': row['Nom'], 'state': 'new', 'payload': payload})
         except ConnectionFailure as exc:
             plan['errors'].append(f'Ligne {index} ({sku}) : {exc}')
+    plan['correspondences'] = resolver.used_mappings
     return plan
 
 
 def import_plan(plan, api, report_path, progress=lambda text: None):
     if plan['errors'] or plan['site'] != api.url:
         raise ConnectionFailure('Aperçu invalide ou boutique différente : recommencez le contrôle.')
-    report = {'site': api.url, 'source': plan['source'], 'total': len(plan['items']), 'results': []}
+    report = {'site': api.url, 'source': plan['source'], 'total': len(plan['items']), 'correspondences': plan.get('correspondences', []), 'results': []}
     def save():
         atomic_write(report_path, json.dumps(report, ensure_ascii=False, indent=2).encode())
     save()  # Verify report storage before any product is created.

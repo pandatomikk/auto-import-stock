@@ -54,3 +54,5 @@ secrets/
 .vault-*
 
 rapport_import_*.json
+
+correspondances/

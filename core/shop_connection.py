@@ -132,7 +132,7 @@ def save_settings(credentials, path=None, *, remember_secrets=False):
 
 def initialize_storage(path=None):
     path = Path(path) if path else settings_path()
-    for directory in (path.parent, path.parent / 'secrets'):
+    for directory in (path.parent, path.parent / 'secrets', path.parent / 'correspondances'):
         directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     if not path.exists():
         from core.secret_store import atomic_write

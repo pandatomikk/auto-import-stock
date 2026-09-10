@@ -34,6 +34,8 @@ class ProductsDialog(tk.Toplevel):
         ttk.Label(box, text='Produits simples publiés. Les UGS déjà présentes seront ignorées. Les images et les catégories doivent déjà exister sur le site.', wraplength=850).pack(anchor='w')
         self.select = ttk.Button(box, text='Choisir et contrôler un CSV…', command=self.choose)
         self.select.pack(anchor='w', pady=12)
+        self.mapping_button = ttk.Button(box, text='Revoir les correspondances…', command=self.review_mappings, state='disabled')
+        self.mapping_button.pack(anchor='w', pady=(0, 8))
         self.source = tk.StringVar(value='Aucun CSV sélectionné')
         ttk.Label(box, textvariable=self.source, wraplength=850).pack(anchor='w')
         table_box = ttk.Frame(box)
@@ -66,14 +68,27 @@ class ProductsDialog(tk.Toplevel):
         self.source.set(filename)
         self.table.delete(*self.table.get_children())
         self.detail('')
-        self.run('plan', lambda: prepare_csv(filename, self.api, self.progress))
+        self.review_mappings()
+
+    def review_mappings(self):
+        if self.busy:
+            return
+        from core.shop_mappings import prepare_mappings
+        self.plan = None
+        self.table.delete(*self.table.get_children())
+        filename = self.source.get()
+        self.run('mappings', lambda: prepare_mappings(filename, self.api, self.progress))
+
+    def apply_mappings(self, choices):
+        filename = self.source.get()
+        self.run('plan', lambda: prepare_csv(filename, self.api, self.progress, mappings=choices))
 
     def progress(self, text):
         self.events.put(('progress', text))
 
     def run(self, kind, operation):
         self.busy = True
-        self.select.configure(state='disabled'); self.send.configure(state='disabled')
+        self.select.configure(state='disabled'); self.send.configure(state='disabled'); self.mapping_button.configure(state='disabled')
         def worker():
             try:
                 self.events.put((kind, operation()))
@@ -105,8 +120,14 @@ class ProductsDialog(tk.Toplevel):
                 self.status.set(result)
                 continue
             self.busy = False
-            self.select.configure(state='normal')
-            if kind == 'plan':
+            self.select.configure(state='normal'); self.mapping_button.configure(state='normal')
+            if kind == 'mappings':
+                if result['rows']:
+                    from core.shop_mappings_ui import MappingsDialog
+                    self.mappings_dialog = MappingsDialog(self, result, self.apply_mappings)
+                else:
+                    self.apply_mappings({})
+            elif kind == 'plan':
                 self.plan = result
                 counts = Counter(item['state'] for item in result['items'])
                 for item in result['items']:
@@ -123,7 +144,7 @@ class ProductsDialog(tk.Toplevel):
             else:
                 self.status.set(result)
                 self.plan = None
-        if self.busy:
+        if self.busy and self.timer is None and not (getattr(self, 'mappings_dialog', None) and self.mappings_dialog.winfo_exists()):
             self.timer = self.after(100, self.poll)
 
     def close(self):
