@@ -259,3 +259,7 @@ Le code de ce dépôt est **open source, sous [licence MIT](LICENSE)** : vous po
 Si vous êtes développeur, cette origine fait partie du contexte du projet. Les retours, corrections, améliorations d’architecture et propositions de réécriture sont les bienvenus. Vous souhaitez reprendre tout ou partie de l’outil et le réécrire à la main ? C’est aussi une contribution bienvenue. Le but est de disposer d’un outil utile, compréhensible et durable pour les commerçants.
 
 Commencez avec un petit lot. Le scénario complet prévu ensuite est : fournir les sources, préparer et envoyer les images, renseigner le CSV avec leurs URL WordPress, attendre la fin des images puis créer les articles. Cette étape teste seulement la dernière partie, avec des images déjà présentes sur le site.
+
+### Sélection des fichiers sous Linux
+
+Les boutons de sélection utilisent le sélecteur natif GNOME via Zenity, ou KDE via KDialog selon le bureau. Sous GNOME, la fenêtre utilise les conventions du bureau et complète Nautilus ; elle ne lance pas Nautilus comme sélecteur. Si aucun de ces composants n’est disponible, le sélecteur Tkinter reste utilisé. Sur Debian/GNOME, Zenity s’installe avec `sudo apt install zenity`.

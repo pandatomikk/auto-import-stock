@@ -3,7 +3,8 @@ import json,os,queue,re,signal,subprocess,sys,threading,time
 from pathlib import Path
 from core.profiles import discover_profiles, read_profile, workflow_kind
 import tkinter as tk
-from tkinter import ttk,filedialog,messagebox
+from tkinter import ttk,messagebox
+from core import file_picker as filedialog
 ROOT=Path(__file__).resolve().parent
 # Only the installed client augments its own process environment.
 if os.name=='nt' and (ROOT/'runtime_windows.json').is_file():

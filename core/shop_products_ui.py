@@ -5,7 +5,8 @@ from pathlib import Path
 import queue
 import threading
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk
+from core import file_picker as filedialog
 import uuid
 from core.shop_connection import ConnectionFailure
 from core.shop_products import ProductAPI, prepare_csv, import_plan

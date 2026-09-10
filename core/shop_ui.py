@@ -2,7 +2,8 @@
 import queue
 import threading
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk
+from core import file_picker as filedialog
 from core.shop_connection import Credentials, ConnectionFailure, check_connection, load_settings, save_settings, VaultError
 
 
