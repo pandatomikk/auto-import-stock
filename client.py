@@ -59,6 +59,7 @@ class Client(tk.Tk):
   actions=ttk.Frame(box);actions.grid(row=8,column=0,columnspan=3,sticky='ew',pady=12)
   self.start_button=ttk.Button(actions,text='Préparer mes produits',style='Primary.TButton',command=self.start);self.start_button.pack(side='left')
   self.stop_button=ttk.Button(actions,text='Arrêter',command=self.stop,state='disabled');self.stop_button.pack(side='left',padx=8)
+  self.log_button=ttk.Button(actions,text='Voir le journal',command=self.open_diagnostic,state='disabled');self.log_button.pack(side='left',padx=8)
   self.open_button=ttk.Button(actions,text='Voir mes fichiers',command=self.open_folder,state='disabled');self.open_button.pack(side='right')
   progress=ttk.Frame(box);progress.grid(row=9,column=0,columnspan=3,sticky='ew')
   self.stage=tk.StringVar(value='1  Lecture de la facture    ·    2  Images    ·    3  Descriptions    ·    4  Fichiers prêts')
@@ -66,6 +67,7 @@ class Client(tk.Tk):
   self.status=tk.StringVar(value='Tout est prêt pour commencer.');ttk.Label(progress,textvariable=self.status,wraplength=800).pack(anchor='w')
   self.bar=ttk.Progressbar(progress,mode='determinate');self.bar.pack(fill='x',pady=8)
   self.eta=tk.StringVar(value='');ttk.Label(progress,textvariable=self.eta).pack(anchor='w')
+  self.activity=tk.StringVar(value='');ttk.Label(progress,textvariable=self.activity,foreground='#84768a',font=('Arial',10)).pack(anchor='w',pady=(4,0))
   ttk.Label(box,text='Vos fichiers restent sur cet ordinateur. Vous choisissez quand les importer dans la boutique.',foreground='#84768a',wraplength=800,font=('Arial',10)).grid(row=10,column=0,columnspan=3,sticky='w',pady=(22,0))
   self.source.trace_add('write',self.selection_changed)
   self.protocol('WM_DELETE_WINDOW',self.close);self.brand_changed();self.poll_timer=self.after(150,self.poll)
@@ -173,6 +175,7 @@ class Client(tk.Tk):
    messagebox.showerror('Dossier inaccessible','Choisissez un fichier dans un dossier où vous pouvez enregistrer les résultats.');return
   self.start_button.configure(state='disabled');self.stop_button.configure(state='normal');self.open_button.configure(state='disabled')
   for w in self.inputs:w.configure(state='disabled')
+  self.started_at=time.monotonic();self.last_event_at=self.started_at;self.activity.set('Démarrage du moteur…');self.log_button.configure(state='normal')
   self.stage.set('1  Préparation');self.status.set('Nous préparons votre espace de travail…');self.bar.configure(mode='indeterminate');self.bar.start(15)
   try:
    self.proc=subprocess.Popen(args,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding='utf-8',errors='replace',env={**os.environ,'PYTHONUNBUFFERED':'1','PYTHONIOENCODING':'utf-8'},start_new_session=os.name!='nt',creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
@@ -180,13 +183,15 @@ class Client(tk.Tk):
    self.record(str(e));self.finish('Impossible de démarrer. Le détail est enregistré dans le fichier de diagnostic.');return
   proc=self.proc
   def read():
-   for line in proc.stdout:self.events.put(('line',line.rstrip()))
+   with proc.stdout:
+    for line in proc.stdout:self.events.put(('line',line.rstrip()))
    self.events.put(('exit',proc.wait()))
   threading.Thread(target=read,daemon=True).start()
  def poll(self):
   for _ in range(150):
    try:kind,data=self.events.get_nowait()
    except queue.Empty:break
+   if kind=='line':self.last_event_at=time.monotonic()
    if kind=='exit':
     result=self.workflow_result if data==0 and not self.stopped else None
     self.finish('Arrêté — relance possible, fichiers terminés conservés.' if self.stopped else ('Vos fichiers sont prêts. Vérifiez le rapport avant l’import.' if data==0 else self.failure_detail or 'La préparation n’a pas pu aboutir. Un diagnostic est disponible dans le dossier des résultats.'))
@@ -197,6 +202,14 @@ class Client(tk.Tk):
       missing=len(result.get('missing_images',[]))
       self.status.set('CSV final : '+Path(result['final_csv']).name+'. Téléversez les images de '+str(Path(result['images_directory']).name)+'/fichiers_webp dans WordPress, puis importez le CSV. Produits au statut publié.'+(f' Attention : {missing} référence(s) sans image, voir le rapport.' if missing else ''))
     continue
+   if data.startswith('ZPSI_PREPARATION '):
+    event=json.loads(data[len('ZPSI_PREPARATION '):]);self.record(data)
+    self.stage.set(event['stage']);self.status.set(event['message']);self.bar.stop()
+    if event.get('total'):
+     self.bar.configure(mode='determinate',maximum=event['total'],value=event.get('done') or 0)
+    else:
+     self.bar.configure(mode='indeterminate');self.bar.start(15)
+    self.eta.set('');continue
    if data.startswith('ZPSI_WORKFLOW '):
     self.workflow_result=json.loads(data[len('ZPSI_WORKFLOW '):]);self.record(data);continue
    if data.startswith('ZPSI_LOCAL_IMAGES '):
@@ -214,7 +227,12 @@ class Client(tk.Tk):
      description=data.startswith('Descriptions :')
      self.stage.set('3  Descriptions' if description else '2  Recherche des images')
      self.status.set('Nous recherchons les descriptions de vos produits…' if description else 'Nous recherchons les photos correspondant à votre facture…');self.bar.stop();self.bar.configure(mode='indeterminate');self.bar.start(15);self.eta.set('Cela peut prendre quelques instants.')
+  if self.proc and hasattr(self,'started_at'):
+   elapsed=int(time.monotonic()-self.started_at);silent=int(time.monotonic()-self.last_event_at)
+   self.activity.set(f'Temps écoulé : {elapsed//60} min {elapsed%60:02d} s' + (f' · Aucune nouvelle information depuis {silent} s ; l’opération peut encore être en cours.' if silent>=15 else ''))
   self.poll_timer=self.after(150,self.poll)
+ def open_diagnostic(self):
+  if self.diagnostic:self.open_path(self.diagnostic)
  def record(self,text):
   if self.diagnostic:
    try:
@@ -222,6 +240,8 @@ class Client(tk.Tk):
    except OSError:pass
  def finish(self,message):
   self.proc=None;self.bar.stop();self.status.set(message);self.eta.set('')
+  if hasattr(self,'started_at'):
+   elapsed=int(time.monotonic()-self.started_at);self.activity.set(f'Durée : {elapsed//60} min {elapsed%60:02d} s')
   self.stage.set('Préparation arrêtée' if self.stopped else 'Fin de la préparation')
   self.start_button.configure(state='normal');self.stop_button.configure(state='disabled');self.open_button.configure(state='normal')
   for w in self.inputs:w.configure(state='normal')

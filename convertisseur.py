@@ -176,7 +176,7 @@ def main() -> int:
             web_descriptions=False if args.no_web_descriptions else None,
         )
     except Exception as exc:
-        print(f"\nERREUR : {exc}", file=sys.stderr)
+        print(f"ERREUR préparation : {exc}", file=sys.stderr, flush=True)
         return 1
 
     print("\n=== TERMINÉ ===")

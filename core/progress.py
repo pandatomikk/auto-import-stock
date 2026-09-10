@@ -10,3 +10,9 @@ class ImageProgress:
         remaining=max(0,self.total-self.done)
         eta=0 if not remaining else (sum(self.samples)/len(self.samples)*remaining/min(self.workers,remaining) if self.samples else None)
         return dict(total=self.total,done=self.done,eta=eta,**self.counts)
+
+
+def preparation_event(stage, message, done=None, total=None):
+    """Structured, flushed events consumed by the desktop client and CLI logs."""
+    import json
+    print('ZPSI_PREPARATION ' + json.dumps({'stage': stage, 'message': message, 'done': done, 'total': total}, ensure_ascii=False), flush=True)

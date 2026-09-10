@@ -76,6 +76,7 @@ def prepare_local_zip_images(zip_path,names,parent,brand,product):
     import hashlib, tempfile, unicodedata
     from .image_webp import optimize_webp
     from .shared import image_ok
+    from .progress import preparation_event
     def slug(value):
         value=unicodedata.normalize('NFKD',str(value)).encode('ascii','ignore').decode().lower()
         return re.sub(r'[^a-z0-9]+','-',value).strip('-')[:100] or 'produit'
@@ -88,7 +89,9 @@ def prepare_local_zip_images(zip_path,names,parent,brand,product):
             info=entries[0]
             digest=hashlib.sha256((info.filename+str(info.CRC)).encode()).hexdigest()[:12]
             target=root/(slug(product)+f'-{number:02d}__{digest}.webp')
-            if not image_ok(target):
+            cached = image_ok(target)
+            preparation_event('Conversion des photos', f'Photo {number}/{len(names)} — {name} : ' + ('déjà prête, réutilisation.' if cached else 'extraction et conversion WebP…'))
+            if not cached:
                 import shutil
                 with tempfile.TemporaryDirectory() as tmp:
                     source=Path(tmp)/'source'

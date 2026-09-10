@@ -263,3 +263,9 @@ Commencez avec un petit lot. Le scénario complet prévu ensuite est : fournir l
 ### Sélection des fichiers sous Linux
 
 Les boutons de sélection utilisent le sélecteur natif GNOME via Zenity, ou KDE via KDialog selon le bureau. Sous GNOME, la fenêtre utilise les conventions du bureau et complète Nautilus ; elle ne lance pas Nautilus comme sélecteur. Si aucun de ces composants n’est disponible, le sélecteur Tkinter reste utilisé. Sur Debian/GNOME, Zenity s’installe avec `sudo apt install zenity`.
+
+### Suivre une préparation
+
+Le client affiche l’étape courante (lecture du catalogue, indexation du ZIP, descriptions fournisseur, conversion WebP, écriture des fichiers), la référence en cours et les compteurs disponibles. Le temps écoulé reste visible ; après 15 secondes sans nouvel événement, une indication d’attente apparaît. Elle ne prouve pas un blocage : une opération disque ou réseau peut encore être en cours. **Voir le journal** ouvre le diagnostic du traitement.
+
+Un CSV WooCommerce déjà préparé doit passer par **Ma boutique → Importer un CSV d’articles**. Le moteur de préparation le signale avant d’indexer les photos : utilisez le catalogue fournisseur original pour refaire une préparation.

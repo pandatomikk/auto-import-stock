@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .io import read_source, write_csv
+from .progress import preparation_event
 from .matcher import detect_mapping
 from .normalization import normalize_name
 from .images import index_zip_images, images_for_sku
@@ -505,6 +506,7 @@ def convert_catalogue(
     """
     Public conversion engine used by the CLI today and a future GUI later.
     """
+    preparation_event('Configuration', 'Chargement du profil fournisseur et des règles de conversion…')
     config = load_json(supplier_config_path)
     from .enrichment import SupplierDescriptions
     settings = dict(config.get("supplier_descriptions", {}))
@@ -514,20 +516,19 @@ def convert_catalogue(
     schema = load_json(schema_path)
     wc_columns: list[str] = schema["columns"]
 
-    image_context = build_zip_image_context(
-        config,
-        images_zip_path,
-        images_base_url,
-    )
-
+    preparation_event('Lecture du catalogue', 'Lecture de ' + source_path.name + '…')
     headers, source_rows = read_source(source_path, config.get("source_options"))
+    if {'UGS', 'Nom', 'Type', 'Publié'}.issubset(set(headers)):
+        raise ValueError('Ce fichier est déjà un CSV WooCommerce. Pour l’envoyer, utilisez Ma boutique → Importer un CSV d’articles. Pour préparer le catalogue, sélectionnez le document fournisseur original.')
     source_row_count = len(source_rows)
+    preparation_event('Analyse des colonnes', f'{source_row_count} lignes lues. Association des colonnes aux champs produit…')
     mapping, issues = detect_mapping(headers, config)
 
     for column in config.get("required_columns", []):
         if column not in headers:
             raise ValueError("Colonne obligatoire absente : " + column)
 
+    preparation_event('Contrôle du catalogue', 'Vérification des quantités, exclusions et doublons…')
     # Exclusions before duplicate handling.
     filtered_rows: list[dict[str, Any]] = []
     excluded: list[dict[str, Any]] = []
@@ -556,6 +557,10 @@ def convert_catalogue(
     )
     issues.extend(duplicate_issues)
 
+    preparation_event('Lecture des images', ('Indexation de ' + images_zip_path.name + '…') if images_zip_path else 'Aucun ZIP à indexer.')
+    image_context = build_zip_image_context(config, images_zip_path, images_base_url)
+    if image_context:
+        preparation_event('Lecture des images', f"{len(image_context['index'].get('__all__', []))} images trouvées dans le ZIP.")
     fixed = dict(schema.get("defaults", {}))
     fixed.update(config.get("fixed_values", {}))
     # Publication is the common export policy, including older installed profiles.
@@ -564,7 +569,7 @@ def convert_catalogue(
     converted: list[dict[str, Any]] = []
     image_identifiers = []
 
-    for source_row in filtered_rows:
+    for product_index, source_row in enumerate(filtered_rows, 1):
         out = {column: "" for column in wc_columns}
 
         for column, value in fixed.items():
@@ -618,9 +623,15 @@ def convert_catalogue(
             if "Attribut 1 global" in out:
                 out["Attribut 1 global"] = attr.get("global", 0)
 
+        reference = str(out.get('UGS') or product_index)
+        preparation_event('Préparation des articles', f'Article {product_index}/{len(filtered_rows)} — {reference}', product_index - 1, len(filtered_rows))
         # Description longue générique et factuelle, construite uniquement
         # à partir des champs réellement disponibles chez le fournisseur.
+        if descriptions.provider:
+            preparation_event('Descriptions fournisseur', f'Article {product_index}/{len(filtered_rows)} — {reference} : recherche de la description (attente du fournisseur possible).', product_index - 1, len(filtered_rows))
         web_text = descriptions.get(_logical_values(source_row, mapping))
+        if descriptions.provider:
+            preparation_event('Descriptions fournisseur', f'{reference} : description récupérée.' if web_text else f'{reference} : description générique conservée.', product_index - 1, len(filtered_rows))
         description_row = source_row
         description_mapping = mapping
         if web_text:
@@ -667,10 +678,12 @@ def convert_catalogue(
             if image_context['local']:
                 from .images import prepare_local_zip_images
                 names=images_for_sku(image_context['index'],sku,'')
+                preparation_event('Images de l’article', f'{reference} : {len(names)} photo(s) à vérifier / convertir en WebP.', product_index - 1, len(filtered_rows))
                 urls=prepare_local_zip_images(image_context['zip_path'],names,source_path.parent,config.get('supplier_name','fournisseur'),out.get('Nom',sku))
             if urls:
                 out["Images"] = ", ".join(urls)
 
+        preparation_event('Préparation des articles', f'Article {product_index}/{len(filtered_rows)} terminé — {reference}', product_index, len(filtered_rows))
         converted.append(out)
         if config.get("export_ean_text"):
             image_identifiers.append({
@@ -687,6 +700,7 @@ def convert_catalogue(
         f"{output_path.stem}_rapport.json"
     )
 
+    preparation_event('Écriture des fichiers', f'Écriture du CSV : {len(converted)} articles…')
     write_csv(output_path, wc_columns, converted)
     ean_export = None
     if config.get("export_ean_text", False):
@@ -726,11 +740,13 @@ def convert_catalogue(
         ],
     }
 
+    preparation_event('Écriture des fichiers', 'Enregistrement du rapport de contrôle…')
     report_path.write_text(
         json.dumps(report, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
+    preparation_event('Fichiers prêts', f'{len(converted)} articles exportés dans {output_path.name}.', len(converted), len(converted))
     return ConversionResult(
         output_path=output_path,
         report_path=report_path,

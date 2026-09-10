@@ -47,6 +47,8 @@ def dependency_ok(py: Path) -> bool:
     return result.returncode == 0
 
 def main() -> int:
+    from core.progress import preparation_event
+    preparation_event('Démarrage', 'Vérification de l’environnement Python et des dépendances…')
     global CONVERTER
     if '--client' in sys.argv[1:]:
         sys.argv.remove('--client')
