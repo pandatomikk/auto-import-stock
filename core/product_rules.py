@@ -51,11 +51,8 @@ def display_values(values, rules):
     model = override.get('name') or model
     raw_color = values.get('color', '')
     colors = rules.get('colors', {})
-    color = colors.get(rule_key(raw_color))
-    if not color and raw_color:
-        parts = [colors.get(rule_key(part)) for part in raw_color.split('/')]
-        if all(parts):
-            color = ' / '.join(dict.fromkeys(parts))
+    from core.color_translations import translate_color
+    color = translate_color(raw_color, colors)
     if raw_color and not color:
         raise ValueError('Couleur non traduite : ' + raw_color + '. Ouvrez Règles produits pour la renseigner.')
     if not model:

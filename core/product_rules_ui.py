@@ -77,10 +77,8 @@ class ProductRulesDialog(tk.Toplevel):
                 self.tables['models'].insert('', 'end', values=(model, shown['model'], shown['category']))
             unknown = 0
             for color in colors:
-                translated = self.rules['colors'].get(rule_key(color))
-                if not translated:
-                    parts = [self.rules['colors'].get(rule_key(part)) for part in color.split('/')]
-                    translated = ' / '.join(dict.fromkeys(parts)) if all(parts) else ''
+                from core.color_translations import translate_color
+                translated = translate_color(color, self.rules['colors']) or ''
                 if not translated: unknown += 1
                 self.tables['colors'].insert('', 'end', values=(color, translated))
             self.status.set(f'{len(models)} modèles · {len(colors)} couleurs · {unknown} traduction(s) à compléter.')
