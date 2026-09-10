@@ -1,0 +1,72 @@
+{
+  "supplier_name": "Fournisseur exemple",
+  "demo": true,
+  "workflow": {
+    "kind": "two_pass"
+  },
+  "required_columns": [
+    "Reference",
+    "Barcode",
+    "Name",
+    "Quantity",
+    "Price",
+    "Color",
+    "Color code"
+  ],
+  "positive_quantity_columns": [
+    "Quantity"
+  ],
+  "mapping_only": true,
+  "force_mapping": {
+    "sku": "Barcode",
+    "ean": "Barcode",
+    "name": "Name",
+    "model": "Reference",
+    "stock": "Quantity",
+    "regular_price": "Price",
+    "color": "Color",
+    "color_code": "Color code"
+  },
+  "fixed_values": {
+    "Marques": "Exemple"
+  },
+  "product_name": {
+    "template": "{name} - {color}"
+  },
+  "short_description": {
+    "template": "Référence commerciale : {model}-{color_code}"
+  },
+  "description_generator": {
+    "enabled": true,
+    "heading_template": "Caractéristiques",
+    "fields": [
+      {
+        "logical": "model",
+        "label": "Référence"
+      },
+      {
+        "logical": "color",
+        "label": "Coloris"
+      }
+    ]
+  },
+  "supplier_descriptions": {
+    "enabled": false
+  },
+  "export_ean_text": true,
+  "images": {
+    "mode": "zip_pattern",
+    "output_mode": "local",
+    "directory": "images_demo",
+    "service_label": "la plateforme fournisseur",
+    "filename_pattern": "^PHOTO_(?P<article>[^_]+)_(?P<color>[^_]+)(?:_(?P<order>\\d+))?$"
+  },
+  "source_options": {
+    "header_columns": [
+      "Reference",
+      "Barcode",
+      "Quantity",
+      "Price"
+    ]
+  }
+}

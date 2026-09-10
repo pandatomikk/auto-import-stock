@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Configuration locale et secrets
+.env
+.env.*
+!.env.example
+
+# Caches et fichiers générés
+cache_descriptions_*/
+cache_dossiers/
+images_*/
+*.log
+
+# Système et éditeurs
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Profils, adaptateurs, données métier et sauvegardes privés
+/private/
+# Anciennes configurations locales (migration)
+/configs/
+# Données et résultats locaux
+*.xlsx
+*.xlsm
+*.zip
+*_session.json
+*_woocommerce*.csv
+*_woocommerce*.txt
+*_woocommerce*.json
+diagnostic_*.txt
+runtime_windows.json
+/tessdata/
