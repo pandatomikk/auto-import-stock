@@ -40,15 +40,19 @@ def install_dependencies(py: Path) -> None:
 
 def dependency_ok(py: Path) -> bool:
     result = subprocess.run(
-        [str(py), "-c", "import openpyxl; import PIL; import gdown"],
+        [str(py), "-c", "import openpyxl; import PIL; import gdown; import keyring; import cryptography"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
     return result.returncode == 0
 
 def main() -> int:
+    global CONVERTER
+    if '--client' in sys.argv[1:]:
+        sys.argv.remove('--client')
+        CONVERTER = APP_DIR / 'client.py'
     # Si déjà lancé dans le venv géré par l'application, on va directement au convertisseur.
-    if in_our_venv():
+    if in_our_venv() and dependency_ok(Path(sys.executable)):
         os.execv(sys.executable, [sys.executable, str(CONVERTER), *sys.argv[1:]])
 
     py = venv_python()

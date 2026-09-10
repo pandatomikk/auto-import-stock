@@ -16,6 +16,8 @@ def copy_application(source, target):
                 shutil.copy2(file, dest)
         elif src.is_file():
             shutil.copy2(src, dst)
+    for name in ['profiles', 'rules', 'adapters']:
+        (target / 'private' / name).mkdir(parents=True, exist_ok=True)
     # Only operational private content is installed, never tests or backups.
     for name in ['profiles', 'rules', 'adapters']:
         src = source / 'private' / name
@@ -77,6 +79,7 @@ def main():
     if not py.exists():subprocess.run([sys.executable,'-m','venv',str(target/'.venv')],check=True)
     subprocess.run([str(py),'-m','pip','install','--disable-pip-version-check','-r',str(target/'requirements.txt')],check=True)
     subprocess.run([str(py),'-c','import tkinter,openpyxl,gdown; from PIL import features; assert features.check("webp")'],check=True)
+    subprocess.run([str(py),'-c','from core.shop_connection import initialize_storage, load_settings; initialize_storage(); load_settings()'],cwd=target,check=True)
     print('Installation des langues OCR...')
     tessdata=target/'tessdata';tessdata.mkdir(exist_ok=True)
     for language in ['fra','eng']:

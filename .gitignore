@@ -48,3 +48,7 @@ runtime_windows.json
 .env.*
 shop.json
 .shop-*.tmp
+
+secrets/
+*.enc
+.vault-*

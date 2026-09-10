@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+from core.secret_store import VaultError, save_secrets, load_secrets, store_path
 import socket
 import ssl
 from urllib.error import HTTPError, URLError
@@ -114,7 +115,9 @@ def save_settings(credentials, path=None, *, remember_secrets=False):
     path = Path(path) if path else settings_path()
     data = {'url': normalize_url(credentials.url), 'username': credentials.username.strip()}
     if remember_secrets:
-        data.update({name: getattr(credentials, name) for name in ('application_password', 'consumer_key', 'consumer_secret')})
+        save_secrets(path, {name: getattr(credentials, name) for name in ('application_password', 'consumer_key', 'consumer_secret')})
+    else:
+        store_path(path).unlink(missing_ok=True)
     path.parent.mkdir(parents=True, exist_ok=True)
     # mkstemp creates mode 0600 from the outset; replacement is atomic.
     descriptor, name = tempfile.mkstemp(prefix='.shop-', suffix='.tmp', dir=path.parent)
@@ -127,10 +130,29 @@ def save_settings(credentials, path=None, *, remember_secrets=False):
         temporary.unlink(missing_ok=True)
 
 
+def initialize_storage(path=None):
+    path = Path(path) if path else settings_path()
+    for directory in (path.parent, path.parent / 'secrets'):
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if not path.exists():
+        from core.secret_store import atomic_write
+        atomic_write(path, b'{}')
+    return path
+
+
 def load_settings(path=None):
     path = Path(path) if path else settings_path()
     try:
         data = json.loads(path.read_text(encoding='utf-8'))
-        return Credentials(url=normalize_url(data.get('url', '')), **{name: str(data.get(name, '')) for name in ('username', 'application_password', 'consumer_key', 'consumer_secret')})
+        if not data.get('url'):
+            return Credentials()
+        credentials = Credentials(url=normalize_url(data.get('url', '')), **{name: str(data.get(name, '')) for name in ('username', 'application_password', 'consumer_key', 'consumer_secret')})
     except (OSError, ValueError, AttributeError, TypeError):
         return Credentials()
+    if any(name in data for name in ('application_password', 'consumer_key', 'consumer_secret')):
+        # Remove plaintext only after encrypted storage and key readback succeed.
+        save_settings(credentials, path, remember_secrets=True)
+    secrets = load_secrets(path)
+    for name in ('application_password', 'consumer_key', 'consumer_secret'):
+        setattr(credentials, name, str(secrets.get(name, '')))
+    return credentials

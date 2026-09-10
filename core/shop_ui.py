@@ -3,7 +3,7 @@ import queue
 import threading
 import tkinter as tk
 from tkinter import ttk, filedialog
-from core.shop_connection import Credentials, ConnectionFailure, check_connection, load_settings, save_settings
+from core.shop_connection import Credentials, ConnectionFailure, check_connection, load_settings, save_settings, VaultError
 
 
 class ShopDialog(tk.Toplevel):
@@ -21,7 +21,12 @@ class ShopDialog(tk.Toplevel):
         box.pack(fill='both', expand=True)
         box.columnconfigure(1, weight=1)
         ttk.Label(box, text='Connexion WordPress et WooCommerce', font=('Arial', 16, 'bold')).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 16))
-        credentials = getattr(parent, 'shop_credentials', None) or load_settings()
+        storage_error = ''
+        try:
+            credentials = getattr(parent, 'shop_credentials', None) or load_settings()
+        except (VaultError, OSError) as exc:
+            credentials = Credentials()
+            storage_error = str(exc) if isinstance(exc, VaultError) else 'Configuration locale inaccessible.'
         self.values = {}
         self.entries = []
         fields = [('url', 'Adresse HTTPS de la boutique'), ('username', 'Identifiant WordPress'), ('application_password', 'Mot de passe d’application WordPress'), ('consumer_key', 'Clé client WooCommerce'), ('consumer_secret', 'Secret client WooCommerce')]
@@ -37,12 +42,12 @@ class ShopDialog(tk.Toplevel):
         self.remember = tk.BooleanVar(value=True)
         self.remember_button = ttk.Checkbutton(box, text='Mémoriser les accès sur ce poste (mot de passe et clés inclus)', variable=self.remember)
         self.remember_button.grid(row=7, column=0, columnspan=2, sticky='w')
-        ttk.Label(box, text='Fichier local non chiffré, hors GitHub, conservé lors des mises à jour. Décochez puis enregistrez pour retirer les secrets du fichier.', wraplength=680).grid(row=8, column=0, columnspan=2, sticky='w', pady=8)
+        ttk.Label(box, text='Secrets chiffrés hors GitHub ; clé protégée par le coffre système. Décochez puis enregistrez pour supprimer le fichier de secrets.', wraplength=680).grid(row=8, column=0, columnspan=2, sticky='w', pady=8)
         self.button = ttk.Button(box, text='Tester la connexion', command=self.start)
         self.button.grid(row=9, column=0, sticky='w', pady=10)
         self.save_button = ttk.Button(box, text='Enregistrer les accès', command=self.persist)
         self.save_button.grid(row=9, column=1, sticky='w', pady=10)
-        self.status = tk.StringVar(value='Le test consulte les API. Aucun produit ni média ne sera envoyé.')
+        self.status = tk.StringVar(value=storage_error or 'Le test consulte les API. Aucun produit ni média ne sera envoyé.')
         ttk.Label(box, textvariable=self.status, wraplength=680).grid(row=10, column=0, columnspan=2, sticky='w', pady=10)
 
         ttk.Separator(box).grid(row=11, column=0, columnspan=2, sticky='ew', pady=10)
@@ -59,6 +64,8 @@ class ShopDialog(tk.Toplevel):
         try:
             credentials = Credentials(**{key: value.get() for key, value in self.values.items()})
             save_settings(credentials, remember_secrets=self.remember.get())
+        except VaultError as exc:
+            self.status.set(str(exc));return False
         except (ConnectionFailure, OSError):
             self.status.set('Enregistrement impossible : vérifiez l’adresse HTTPS et les droits du dossier de configuration.')
             return False

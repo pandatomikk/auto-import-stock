@@ -34,4 +34,5 @@ class InstallerTest(unittest.TestCase):
             (source / 'client.py').write_text('public')
             copy_application(source, dest)
             self.assertTrue((dest / 'profiles/demo.json').exists())
-            self.assertFalse((dest / 'private').exists())
+            self.assertTrue((dest / 'private/profiles').is_dir())
+            self.assertTrue((dest / 'private/rules').is_dir())

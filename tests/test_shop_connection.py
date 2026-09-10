@@ -11,6 +11,13 @@ from core.shop_connection import Credentials, ConnectionFailure, NoRedirect, che
 
 class ConnectionTests(unittest.TestCase):
     def setUp(self):
+        from unittest.mock import Mock
+        self.vault = Mock()
+        keys = {}
+        self.vault.get_password.side_effect = lambda service, account: keys.get((service, account))
+        self.vault.set_password.side_effect = lambda service, account, key: keys.__setitem__((service, account), key)
+        patcher = patch('core.secret_store.system_vault', return_value=self.vault)
+        patcher.start(); self.addCleanup(patcher.stop)
         self.credentials = Credentials('https://shop.example/store/', 'operator', 'abcd efgh', 'ck_test', 'cs_test')
 
     def test_url_validation(self):
@@ -64,6 +71,9 @@ class ConnectionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'shop.json'
             save_settings(self.credentials, path, remember_secrets=True)
+            self.assertNotIn(self.credentials.consumer_secret, path.read_text())
+            encrypted = path.parent / 'secrets/shop.enc'
+            self.assertNotIn(self.credentials.consumer_secret.encode(), encrypted.read_bytes())
             restored = load_settings(path)
             self.assertEqual(restored.application_password, self.credentials.application_password)
             self.assertEqual(restored.consumer_secret, self.credentials.consumer_secret)
@@ -73,6 +83,19 @@ class ConnectionTests(unittest.TestCase):
             self.assertEqual(load_settings(path).consumer_secret, '')
             self.assertNotIn('application_password', json.loads(path.read_text()))
             self.assertEqual(list(Path(folder).glob('.shop-*')), [])
+
+    def test_plaintext_migration_and_vault_failure(self):
+        from core.secret_store import VaultError
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'shop.json'
+            legacy = {'url': self.credentials.url, 'username': 'operator', 'application_password': 'old-secret'}
+            path.write_text(json.dumps(legacy))
+            with patch('core.secret_store.system_vault', side_effect=VaultError('Locked')):
+                with self.assertRaises(VaultError):
+                    load_settings(path)
+            self.assertEqual(json.loads(path.read_text()), legacy)
+            self.assertEqual(load_settings(path).application_password, 'old-secret')
+            self.assertNotIn('old-secret', path.read_text())
 
     @patch('core.shop_connection.build_opener')
     def test_transport_is_get_and_header_auth(self, opener):

@@ -20,6 +20,8 @@ class ExampleClientTest(unittest.TestCase):
         pack_env = patch.dict(os.environ, {'AUTO_IMPORT_PRIVATE_DIR':str(self.root / 'empty-pack')})
         pack_env.start()
         self.addCleanup(pack_env.stop)
+        storage = patch('core.shop_connection.settings_path', return_value=self.root / 'settings/shop.json')
+        storage.start(); self.addCleanup(storage.stop)
         try:
             self.app = Client()
         except tk.TclError as exc:

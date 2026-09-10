@@ -14,6 +14,10 @@ if os.name=='nt' and (ROOT/'runtime_windows.json').is_file():
 class Client(tk.Tk):
  def __init__(self):
   super().__init__();self.title('Import fournisseurs — ZPSI · V0.20');self.geometry('960x720');self.minsize(820,680);self.configure(bg='#f4f1f7')
+  from core.shop_connection import initialize_storage
+  from core.profiles import private_directory
+  initialize_storage()
+  for name in ('profiles','rules','adapters'):(private_directory()/name).mkdir(parents=True,exist_ok=True)
   self.configs={p.stem:read_profile(p) for p in discover_profiles()}
   default=next((key for key,value in self.configs.items() if value.get('default')),next(iter(self.configs),''))
   self.image_values={}
