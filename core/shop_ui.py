@@ -11,15 +11,21 @@ class ShopDialog(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.title('Ma boutique · V0.20')
-        self.geometry('780x820')
+        self.geometry(f'780x{min(820, max(500, self.winfo_screenheight()-100))}')
         self.transient(parent)
         self.parent = parent
         self.events = queue.Queue()
         self.timer = None
         self.busy = False
         self.protocol('WM_DELETE_WINDOW', self.close)
-        box = ttk.Frame(self, padding=24)
-        box.pack(fill='both', expand=True)
+        canvas = tk.Canvas(self, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self, orient='vertical', command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side='right', fill='y'); canvas.pack(fill='both', expand=True)
+        box = ttk.Frame(canvas, padding=24)
+        window = canvas.create_window((0, 0), window=box, anchor='nw')
+        box.bind('<Configure>', lambda event: canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.bind('<Configure>', lambda event: canvas.itemconfigure(window, width=event.width))
         box.columnconfigure(1, weight=1)
         ttk.Label(box, text='Connexion WordPress et WooCommerce', font=('Arial', 16, 'bold')).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 16))
         storage_error = ''

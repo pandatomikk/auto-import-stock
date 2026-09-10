@@ -132,12 +132,12 @@ class ProductsDialog(tk.Toplevel):
                 counts = Counter(item['state'] for item in result['items'])
                 for item in result['items']:
                     self.table.insert('', 'end', values=(item['line'], item['sku'], item['name'], 'Créer' if item['state'] == 'new' else 'Ignorer : existe'))
-                self.detail('\n'.join(result['errors']) or 'Contrôle terminé. Les données contrôlées seront utilisées telles quelles pour cet envoi.')
+                self.detail('\n'.join(result['errors'] + result.get('warnings', [])) or 'Contrôle terminé. Les données contrôlées seront utilisées telles quelles pour cet envoi.')
                 self.status.set(f"{counts['new']} à créer · {counts['existing']} déjà présents · {len(result['errors'])} erreur(s)")
                 self.send.configure(text=f"Créer et publier les {counts['new']} nouveaux articles", state='normal' if counts['new'] and not result['errors'] else 'disabled')
             elif kind == 'report':
                 counts = Counter(item['state'] for item in result['results'])
-                self.status.set(f"{counts['created']} créé(s) · {counts['skipped']} ignoré(s) · {counts['unconfirmed']} non confirmé(s) · {result['total'] - len(result['results'])} non traité(s)." + (' Envoi arrêté : vérifiez la boutique.' if counts['unconfirmed'] else ''))
+                self.status.set(f"{counts['created']} créé(s) · {counts['skipped']} ignoré(s) · {counts['rejected']} refusé(s) · {counts['unconfirmed']} non confirmé(s) · {result['total'] - len(result['results'])} non traité(s)." + (' Envoi arrêté : vérifiez la boutique.' if counts['unconfirmed'] or counts['rejected'] else ''))
                 messages = [r['message'] for r in result['results'] if r.get('message')]
                 self.detail('Rapport : ' + str(self.report_path) + '\n' + '\n'.join(messages))
                 self.plan = None

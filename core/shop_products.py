@@ -14,6 +14,42 @@ from core.shop_connection import ConnectionFailure, NoRedirect, normalize_url
 from core.secret_store import atomic_write
 
 
+class ProductRequestFailure(ConnectionFailure):
+    def __init__(self, message, rejected=False):
+        super().__init__(message)
+        self.rejected = rejected
+
+
+def api_error(exc, credentials, writing):
+    status = exc.code
+    try:
+        data = json.loads(exc.read(65536))
+        if not isinstance(data, dict): data = {}
+    except (OSError, ValueError):
+        data = {}
+    finally:
+        exc.close()
+    code = str(data.get('code', ''))
+    message = str(data.get('message', ''))
+    parameters = data.get('data', {})
+    parameters = parameters.get('params', {}) if isinstance(parameters, dict) else {}
+    details = ' ; '.join(f'{key} : {value}' for key, value in parameters.items()) if isinstance(parameters, dict) else ''
+    text = html.unescape(re.sub(r'<[^>]*>', '', ' — '.join(x for x in [code, message, details] if x)))
+    # Never echo reflected credentials in the UI or report.
+    from urllib.parse import quote
+    secrets = [credentials.application_password, ''.join(credentials.application_password.split()), credentials.consumer_key, credentials.consumer_secret]
+    basic = base64.b64encode(f'{credentials.consumer_key.strip()}:{credentials.consumer_secret.strip()}'.encode()).decode()
+    for secret in sorted([*secrets, basic], key=len, reverse=True):
+        if secret:
+            text = text.replace(secret, '[masqué]').replace(quote(secret, safe=''), '[masqué]')
+    text = ' '.join(text.split())[:2000]
+    rejected = status == 400 and code in ('rest_invalid_param', 'rest_missing_callback_param')
+    explanation = f'API : HTTP {status}' + (f' — {text}' if text else '. Aucun détail exploitable retourné par le serveur.')
+    if writing:
+        explanation += ' Article refusé avant création : corrigez les champs indiqués.' if rejected else ' Création non confirmée : vérifiez la boutique avant de relancer.'
+    return ProductRequestFailure(explanation, rejected=rejected)
+
+
 class ProductAPI:
     def __init__(self, credentials):
         self.credentials = credentials
@@ -41,9 +77,7 @@ class ProductAPI:
                 raise ValueError()
             return json.loads(raw)
         except HTTPError as exc:
-            code = exc.code
-            exc.close()
-            raise ConnectionFailure(f'API : erreur HTTP {code}. Vérifiez les accès et les droits du site.' + (' Création non confirmée : vérifiez la boutique avant de relancer.' if payload is not None else '')) from None
+            raise api_error(exc, c, payload is not None) from None
         except (OSError, URLError, ValueError):
             raise ConnectionFailure('Réponse API absente ou invalide.' + (' Création non confirmée : vérifiez la boutique avant de relancer.' if payload is not None else '')) from None
 
@@ -277,7 +311,12 @@ def prepare_csv(path, api, progress=lambda text: None, mappings=None):
             plan['items'].append({'line': index, 'sku': sku, 'name': row['Nom'], 'state': 'new', 'payload': payload})
         except ConnectionFailure as exc:
             plan['errors'].append(f'Ligne {index} ({sku}) : {exc}')
-    plan['correspondences'] = resolver.used_mappings
+    plan['correspondences'] = list({(entry['kind'], entry['source'], entry['id']): entry for entry in resolver.used_mappings}.values())
+    new = [item for item in plan['items'] if item['state'] == 'new']
+    plan['warnings'] = []
+    for field, label in [('images', 'image'), ('categories', 'catégorie')]:
+        count = sum(not item['payload'].get(field) for item in new)
+        if count: plan['warnings'].append(f'{count} nouvel article(s) sans {label}. Vérifiez que ce CSV est bien le résultat de la dernière préparation finalisée.')
     return plan
 
 
@@ -309,6 +348,7 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
             record.update(state='created', id=result['id'], url=result.get('permalink', ''))
         except ConnectionFailure as exc:
             record['message'] = str(exc)
+            if getattr(exc, 'rejected', False): record['state'] = 'rejected'
             save()
             break  # No automatic retry of a possibly successful write.
         save()
