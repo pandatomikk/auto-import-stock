@@ -37,7 +37,9 @@ def copy_application(source, target):
                     current = json.loads(existing.read_text(encoding='utf-8'))
                     template = json.loads(file.read_text(encoding='utf-8'))
                     # Preserve business mappings while migrating adapter routing.
-                    for key in ['workflow', 'default']:
+                    for key in ['workflow', 'default', 'product_rules']:
+                        if key == 'product_rules' and key in current:
+                            continue
                         if key in template:
                             current[key] = template[key]
                     for key in ['mode', 'directory', 'service_label', 'filename_pattern']:

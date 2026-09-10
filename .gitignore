@@ -56,3 +56,6 @@ secrets/
 rapport_import_*.json
 
 correspondances/
+
+regles-produits/
+sauvegarde_preparation_*/

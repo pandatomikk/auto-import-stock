@@ -53,14 +53,14 @@ def choose_source_cli() -> Path:
             return path.resolve()
         print("Fichier introuvable.")
 
-def run_two_pass(source=None, config=None, output=None, session=None, images_zip=None):
+def run_two_pass(source=None, config=None, output=None, session=None, images_zip=None, rules_path=None, rebuild=False):
     import json
     from core.media_workflow import prepare_catalogue, finalize_catalogue, workflow_event
     try:
         if session is not None:
             data = finalize_catalogue(session, images_zip)
         else:
-            session, data = prepare_catalogue(source, config, SCHEMA, output)
+            session, data = prepare_catalogue(source, config, SCHEMA, output, rules_path=rules_path, rebuild=rebuild)
         event = workflow_event(session, data)
         print('ZPSI_WORKFLOW ' + json.dumps(event, ensure_ascii=False), flush=True)
         if data['status'] == 'waiting_images':
@@ -81,6 +81,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Convertisseur de catalogues fournisseurs vers WooCommerce."
     )
+    parser.add_argument('--product-rules', type=Path, help='Règles locales de présentation')
+    parser.add_argument('--rebuild-preparation', action='store_true', help='Recréer une préparation en sauvegardant la précédente')
     parser.add_argument("--supplier", help="Nom du fichier config sans .json, ex: demo")
     parser.add_argument("--source", type=Path, help="Catalogue fournisseur")
     parser.add_argument("--output", type=Path, help="CSV WooCommerce de sortie")
@@ -134,7 +136,7 @@ def main() -> int:
     if workflow_kind(supplier_cfg) == 'two_pass':
         if args.images_zip:
             parser.error('Préparer d’abord le catalogue sans ZIP, puis utiliser --resume-session avec --images-zip.')
-        return run_two_pass(source, config, args.output)
+        return run_two_pass(source, config, args.output, rules_path=args.product_rules, rebuild=args.rebuild_preparation)
     if workflow_kind(supplier_cfg) == 'invoice':
         try:
             return load_adapter(supplier_cfg['workflow']['adapter']).run(args, source, supplier_cfg)
@@ -174,6 +176,7 @@ def main() -> int:
             images_zip_path=images_zip,
             images_base_url=images_url,
             web_descriptions=False if args.no_web_descriptions else None,
+            product_rules_path=args.product_rules,
         )
     except Exception as exc:
         print(f"ERREUR préparation : {exc}", file=sys.stderr, flush=True)

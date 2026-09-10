@@ -502,12 +502,15 @@ def convert_catalogue(
     images_zip_path: Path | None = None,
     images_base_url: str | None = None,
     web_descriptions: bool | None = None,
+    product_rules_path: Path | None = None,
 ) -> ConversionResult:
     """
     Public conversion engine used by the CLI today and a future GUI later.
     """
     preparation_event('Configuration', 'Chargement du profil fournisseur et des règles de conversion…')
     config = load_json(supplier_config_path)
+    from .product_rules import load_rules, display_values, logical_values
+    presentation_rules = load_rules(config, product_rules_path)
     from .enrichment import SupplierDescriptions
     settings = dict(config.get("supplier_descriptions", {}))
     if web_descriptions is not None:
@@ -625,6 +628,7 @@ def convert_catalogue(
 
         reference = str(out.get('UGS') or product_index)
         preparation_event('Préparation des articles', f'Article {product_index}/{len(filtered_rows)} — {reference}', product_index - 1, len(filtered_rows))
+        presentation = display_values(logical_values(source_row, mapping), presentation_rules) if presentation_rules.get('enabled') else None
         # Description longue générique et factuelle, construite uniquement
         # à partir des champs réellement disponibles chez le fournisseur.
         if descriptions.provider:
@@ -637,6 +641,9 @@ def convert_catalogue(
         if web_text:
             description_row = dict(source_row, __web_description=web_text)
             description_mapping = dict(mapping, description={"source": "__web_description"})
+        if presentation and 'color' in mapping:
+            description_row = dict(description_row)
+            description_row[mapping['color']['source']] = presentation['color']
         generated_description = build_generic_description(
             description_row,
             config,
@@ -659,6 +666,11 @@ def convert_catalogue(
         if formatted_name and "Nom" in out:
             out["Nom"] = formatted_name
 
+        if presentation:
+            out['Nom'] = presentation['title']
+            out['Catégories'] = presentation['category']
+            if logical_attr == 'color':
+                out['Valeur(s) de l’attribut 1 '] = presentation['color']
         # V5.3 : si un ZIP est fourni, on efface d'abord toute valeur image
         # issue du fichier fournisseur, puis on reconstruit Images UNIQUEMENT
         # avec les fichiers réellement présents dans le ZIP courant.

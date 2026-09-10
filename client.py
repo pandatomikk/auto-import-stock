@@ -43,10 +43,11 @@ class Client(tk.Tk):
   tk.Label(header,text='Vos produits, prêts pour la boutique.',bg='#3c1648',fg='white',font=('Arial',23,'bold')).pack(anchor='w',padx=32)
   tk.Label(header,text='Une facture, des images. On prépare le reste.',bg='#3c1648',fg='#ddcde5',font=('Arial',11)).pack(anchor='w',padx=32,pady=5)
   box=ttk.Frame(self,padding=26);box.pack(fill='both',expand=True,padx=24,pady=22);box.columnconfigure(1,weight=1)
+  self.rules_button=ttk.Button(box,text='Règles produits…',command=self.open_product_rules);self.rules_button.grid(row=0,column=2,sticky='e')
   ttk.Label(box,text='Votre sélection',font=('Arial',15,'bold')).grid(row=0,column=0,columnspan=3,sticky='w',pady=(0,16))
   self.brand=tk.StringVar(value=default);self.source=tk.StringVar();self.drive=tk.StringVar();self.zip=tk.StringVar();self.base=tk.StringVar();self.test=tk.BooleanVar(value=True);self.web=tk.BooleanVar(value=True)
   ttk.Label(box,text='Marque').grid(row=1,column=0,sticky='w');self.select=ttk.Combobox(box,textvariable=self.brand,values=list(self.configs),state='readonly');self.select.grid(row=1,column=1,sticky='ew');self.select.bind('<<ComboboxSelected>>',self.brand_changed)
-  self.inputs=[self.select]
+  self.inputs=[self.select,self.rules_button]
   self.field(box,2,'Facture / catalogue',self.source,lambda:self.pick(self.source))
   self.image_label=ttk.Label(box,text='Images');self.image_label.grid(row=3,column=0,sticky='w')
   self.image_entry=ttk.Entry(box,textvariable=self.drive);self.image_entry.grid(row=3,column=1,sticky='ew');self.inputs.append(self.image_entry)
@@ -71,6 +72,20 @@ class Client(tk.Tk):
   ttk.Label(box,text='Vos fichiers restent sur cet ordinateur. Vous choisissez quand les importer dans la boutique.',foreground='#84768a',wraplength=800,font=('Arial',10)).grid(row=10,column=0,columnspan=3,sticky='w',pady=(22,0))
   self.source.trace_add('write',self.selection_changed)
   self.protocol('WM_DELETE_WINDOW',self.close);self.brand_changed();self.poll_timer=self.after(150,self.poll)
+ def open_product_rules(self):
+  if self.proc:return
+  from core.product_rules import rules_path
+  from core.product_rules_ui import ProductRulesDialog
+  source=Path(self.source.get()).expanduser()
+  if source.suffix.lower()=='.json':
+   from core.media_workflow import load_session
+   try:source=Path(load_session(source)['source'])
+   except (OSError,ValueError):pass
+  if not source.is_file():messagebox.showerror('Source','Sélectionnez le document fournisseur original.');return
+  def saved():
+   self.source.set(str(source));self.rebuild_preparation=self.is_two_pass();self.refresh_two_pass()
+   self.status.set('Règles enregistrées. Relancez la préparation pour les appliquer ; la préparation précédente sera sauvegardée.')
+  ProductRulesDialog(self,self.configs[self.brand.get()],source,rules_path(self.brand.get()),saved)
  def open_shop(self):
   from core.shop_ui import ShopDialog
   if getattr(self,'shop_dialog',None) is not None and self.shop_dialog.winfo_exists():
@@ -110,6 +125,7 @@ class Client(tk.Tk):
     if source.suffix.lower()=='.json' or (data['status']=='waiting_images' and data.get('source')==str(source.resolve())):
      self.resume_path=candidate.resolve()
    except (OSError,ValueError):pass
+  if getattr(self,'rebuild_preparation',False):self.resume_path=None
   waiting=self.resume_path is not None
   self.start_button.configure(text='2 · Finaliser avec les images' if waiting else '1 · Préparer le CSV et les EAN')
   self.image_label.configure(text='ZIP des images' if waiting else 'Images à récupérer à l’étape 2')
@@ -130,6 +146,7 @@ class Client(tk.Tk):
    data=load_session(self.resume_path);self.open_path(self.resume_path.parent/data['ean_text'])
   except (OSError,ValueError) as exc:messagebox.showerror('Liste EAN',str(exc))
  def brand_changed(self,event=None,show_status=True):
+  if event is not None:self.rebuild_preparation=False
   if event is not None:self.image_values[self.previous_brand]=self.drive.get()
   brand=self.brand.get()
   if not brand:
@@ -166,6 +183,9 @@ class Client(tk.Tk):
    args=[python_exe,'-u',str(ROOT/'lancer.py'),'--resume-session',str(self.resume_path),'--images-zip',str(Path(self.drive.get()).expanduser().resolve())]
   elif workflow_kind(self.configs[self.brand.get()])=='invoice':args+=['--drive-url',self.drive.get().strip(),'--test-images' if self.test.get() else '--all-images']
   elif self.configs[self.brand.get()].get('images',{}).get('mode')=='zip_by_sku':args+=['--images-zip',self.drive.get()]
+  from core.product_rules import rules_path
+  args+=['--product-rules',str(rules_path(self.brand.get()))]
+  if getattr(self,'rebuild_preparation',False) and not self.resume_path:args+=['--rebuild-preparation']
   if self.is_two_pass() or not self.web.get() or self.configs[self.brand.get()].get('images',{}).get('mode')=='none':args+=['--no-web-descriptions']
   self.workflow_result=None;self.failure_detail=None
   try:
@@ -196,6 +216,7 @@ class Client(tk.Tk):
     result=self.workflow_result if data==0 and not self.stopped else None
     self.finish('Arrêté — relance possible, fichiers terminés conservés.' if self.stopped else ('Vos fichiers sont prêts. Vérifiez le rapport avant l’import.' if data==0 else self.failure_detail or 'La préparation n’a pas pu aboutir. Un diagnostic est disponible dans le dossier des résultats.'))
     if result:
+     self.rebuild_preparation=False
      if result['status']=='waiting_images':self.refresh_two_pass(show_status=True)
      else:
       self.stage.set('Préparation · CSV final prêt pour WordPress')

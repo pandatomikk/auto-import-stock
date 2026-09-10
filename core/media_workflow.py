@@ -71,14 +71,14 @@ def workflow_event(path, data):
                 images_directory=str(path.parent / data.get('image_settings', {}).get('directory', 'images_produits')))
 
 
-def prepare_catalogue(source, config, schema, output=None):
+def prepare_catalogue(source, config, schema, output=None, rules_path=None, rebuild=False):
     source = Path(source).expanduser().resolve()
     config_path = Path(config)
     profile = read_profile(config_path)
     session_path = session_path_for(source, output)
     if session_path.exists():
         previous = load_session(session_path)
-        if previous['status'] == 'waiting_images':
+        if previous['status'] == 'waiting_images' and not rebuild:
             if previous.get('source') != str(source) or previous.get('supplier') != config_path.stem:
                 raise ValueError('Une autre préparation utilise cette sortie. Choisir un autre nom de CSV.')
             if not (session_path.parent / previous['prepared_csv']).is_file():
@@ -92,7 +92,7 @@ def prepare_catalogue(source, config, schema, output=None):
     # Keep an existing preparation intact if the new catalogue fails validation.
     with tempfile.TemporaryDirectory(dir=final.parent, prefix='.preparation-') as tmp:
         staged = Path(tmp) / prepared.name
-        result = convert_catalogue(source, Path(config), Path(schema), staged, web_descriptions=False)
+        result = convert_catalogue(source, Path(config), Path(schema), staged, web_descriptions=False, product_rules_path=rules_path)
         if not result.row_count:
             raise ValueError('Aucun produit commandé à préparer. Vérifier les quantités et les codes-barres.')
         report = json.loads(result.report_path.read_text(encoding='utf-8'))
@@ -103,6 +103,13 @@ def prepare_catalogue(source, config, schema, output=None):
         report['ean_text']['path'] = str(ean_path)
         report['workflow_status'] = 'waiting_images'
         result.report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+        if rebuild and session_path.exists():
+            import shutil, uuid
+            backup = final.parent / ('sauvegarde_preparation_' + uuid.uuid4().hex[:12])
+            backup.mkdir()
+            old = load_session(session_path)
+            for file in [session_path, *(final.parent / old[key] for key in ('prepared_csv', 'ean_text', 'preparation_report'))]:
+                if file.exists(): shutil.copy2(file, backup / file.name)
         staged.replace(prepared)
         staged_ean.replace(ean_path)
         preparation_report = prepared.with_name(prepared.stem + '_rapport.json')

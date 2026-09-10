@@ -28,8 +28,8 @@ class ProductAPI:
         if not user or not password:
             raise ConnectionFailure('Les accès WordPress sont nécessaires pour retrouver les images de la médiathèque.')
         # Restrict every write to product creation, never updates or deletions.
-        if payload is not None and route != 'wc/v3/products':
-            raise ConnectionFailure('Seule la création de produits est autorisée.')
+        if payload is not None and route not in ('wc/v3/products', 'wc/v3/products/categories'):
+            raise ConnectionFailure('Seule la création de produits ou de catégories est autorisée.')
         address = self.url + '/wp-json/' + route + ('?' + urlencode(query) if query else '')
         token = base64.b64encode(f'{user}:{password}'.encode()).decode('ascii')
         request = Request(address, data=None if payload is None else json.dumps(payload).encode(), method='GET' if payload is None else 'POST', headers={'Authorization': 'Basic ' + token, 'Accept': 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'AutoImportStock/0.20'})
@@ -63,6 +63,20 @@ class ProductAPI:
         if not isinstance(result, list) or any(not isinstance(x, dict) or not isinstance(x.get('id'), int) for x in result):
             raise ConnectionFailure('Recherche de référence invalide : contrôle interrompu.')
         # A comma in a SKU acts as a list in WooCommerce; CSV validation rejects it.
+        return result
+
+    def create_category(self, name):
+        name = name.strip()
+        if not name or '>' in name:
+            raise ConnectionFailure('Renseignez un nom de catégorie simple. Pour une hiérarchie, créez-la dans WordPress.')
+        existing = [term for term in self.listing('wc/v3/products/categories') if html.unescape(term.get('name', '')).casefold() == name.casefold() and not term.get('parent')]
+        if len(existing) == 1:
+            return existing[0]
+        if existing:
+            raise ConnectionFailure('Plusieurs catégories correspondent : choisissez dans la liste.')
+        result = self.request('wc/v3/products/categories', payload={'name': name, 'parent': 0})
+        if not isinstance(result, dict) or type(result.get('id')) is not int or not result.get('name'):
+            raise ConnectionFailure('Création de catégorie non confirmée. Rechargez les correspondances avant de réessayer.')
         return result
 
     def create(self, payload):
