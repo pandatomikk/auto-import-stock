@@ -81,10 +81,49 @@ class MappingTests(unittest.TestCase):
         try:
             callback.assert_not_called()
             self.assertEqual(load_mappings(self.api.url), {})
-            dialog.choice.current(dialog.option_ids.index(9)); dialog.changed()
+            dialog.group.current(dialog.group_ids.index(9)); dialog.group_changed()
             dialog.apply()
             callback.assert_called_once_with({'brands': {'exem': 9}})
             self.assertEqual(load_mappings(self.api.url)['brands']['exem'], 9)
         finally:
             if dialog.winfo_exists(): dialog.close()
             owner.destroy()
+
+
+    def test_category_groups_filter_destinations_and_clear_previous_choice(self):
+        import tkinter as tk
+        from core.shop_mappings_ui import MappingsDialog
+        try: owner = tk.Tk()
+        except tk.TclError: self.skipTest('Display unavailable')
+        owner.withdraw(); owner.select = Mock(); owner.mapping_button = Mock()
+        review = {'site': self.api.url, 'options': {'categories': {1:'A', 2:'B', 3:'A > Sacs', 4:'B > Sacs', 5:'A > Sacs > Mini'}}, 'category_parents': {1:0, 2:0, 3:1, 4:2, 5:3}, 'rows': [{'kind':'categories', 'source':'Sacs', 'id':3, 'state':'Choisi'}]}
+        callback = Mock()
+        dialog = MappingsDialog(owner, review, callback); dialog.withdraw()
+        try:
+            self.assertEqual(dialog.group_ids[dialog.group.current()], 1)
+            self.assertEqual(set(dialog.option_ids), {None,1,3,5})
+            dialog.group.current(dialog.group_ids.index(2)); dialog.group_changed()
+            self.assertIsNone(review['rows'][0]['id'])
+            self.assertEqual(set(dialog.option_ids), {None,2,4})
+            dialog.apply(); callback.assert_not_called()
+            dialog.choice.current(dialog.option_ids.index(4)); dialog.changed()
+            dialog.apply()
+            callback.assert_called_once_with({'categories': {'sacs':4}})
+        finally:
+            if dialog.winfo_exists():dialog.close()
+            owner.destroy()
+
+    def test_create_category_under_selected_parent(self):
+        from core.shop_products import ProductAPI
+        from core.shop_connection import Credentials
+        api = ProductAPI(Credentials('https://shop.example', consumer_key='k', consumer_secret='s'))
+        terms = [{'id':1,'name':'A','parent':0}, {'id':2,'name':'Sacs','parent':0}]
+        with patch.object(api, 'listing', return_value=terms), patch.object(api, 'request', return_value={'id':3,'name':'Sacs','parent':1}) as request:
+            self.assertEqual(api.create_category('Sacs', parent=1)['id'],3)
+            request.assert_called_once_with('wc/v3/products/categories', payload={'name':'Sacs','parent':1})
+        with patch.object(api, 'listing', return_value=terms+[{'id':3,'name':'Sacs','parent':1}]), patch.object(api, 'request') as request:
+            self.assertEqual(api.create_category('Sacs', parent=1)['id'],3)
+            request.assert_not_called()
+        with patch.object(api, 'listing', return_value=terms), patch.object(api, 'request') as request:
+            with self.assertRaises(ConnectionFailure):api.create_category('Sacs', parent=999)
+            request.assert_not_called()

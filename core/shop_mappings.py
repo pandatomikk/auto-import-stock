@@ -79,6 +79,8 @@ def prepare_mappings(filename, api, progress=lambda text: None):
         progress('Chargement des ' + column.lower() + ' de la boutique…')
         terms = api.listing('wc/v3/products/' + kind)
         labels = term_labels(kind, terms)
+        if kind == 'categories':
+            review['category_parents'] = {term['id']: term.get('parent', 0) for term in terms}
         review['options'][kind] = labels
         for source in sources:
             key = source_key(source)

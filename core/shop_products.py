@@ -99,16 +99,19 @@ class ProductAPI:
         # A comma in a SKU acts as a list in WooCommerce; CSV validation rejects it.
         return result
 
-    def create_category(self, name):
+    def create_category(self, name, parent=0):
         name = name.strip()
         if not name or '>' in name:
             raise ConnectionFailure('Renseignez un nom de catégorie simple. Pour une hiérarchie, créez-la dans WordPress.')
-        existing = [term for term in self.listing('wc/v3/products/categories') if html.unescape(term.get('name', '')).casefold() == name.casefold() and not term.get('parent')]
+        terms = self.listing('wc/v3/products/categories')
+        if type(parent) is not int or parent < 0 or (parent and parent not in {term['id'] for term in terms}):
+            raise ConnectionFailure('Catégorie parente introuvable : rechargez les correspondances.')
+        existing = [term for term in terms if html.unescape(term.get('name', '')).casefold() == name.casefold() and term.get('parent', 0) == parent]
         if len(existing) == 1:
             return existing[0]
         if existing:
             raise ConnectionFailure('Plusieurs catégories correspondent : choisissez dans la liste.')
-        result = self.request('wc/v3/products/categories', payload={'name': name, 'parent': 0})
+        result = self.request('wc/v3/products/categories', payload={'name': name, 'parent': parent})
         if not isinstance(result, dict) or type(result.get('id')) is not int or not result.get('name'):
             raise ConnectionFailure('Création de catégorie non confirmée. Rechargez les correspondances avant de réessayer.')
         return result
