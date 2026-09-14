@@ -569,6 +569,12 @@ def convert_catalogue(
     # Publication is the common export policy, including older installed profiles.
     fixed["Publié"] = 1
 
+    image_progress = None
+    if image_context and image_context['local'] and 'sku' in mapping:
+        from .progress import ConversionProgress
+        image_progress = ConversionProgress(sum(
+            len(images_for_sku(image_context['index'], clean_identifier(row.get(mapping['sku']['source'], '')), ''))
+            for row in filtered_rows))
     converted: list[dict[str, Any]] = []
     image_identifiers = []
 
@@ -691,7 +697,7 @@ def convert_catalogue(
                 from .images import prepare_local_zip_images
                 names=images_for_sku(image_context['index'],sku,'')
                 preparation_event('Images de l’article', f'{reference} : {len(names)} photo(s) à vérifier / convertir en WebP.', product_index - 1, len(filtered_rows))
-                urls=prepare_local_zip_images(image_context['zip_path'],names,(output_path.parent if output_path else source_path.parent),config.get('supplier_name','fournisseur'),out.get('Nom',sku))
+                urls=prepare_local_zip_images(image_context['zip_path'],names,(output_path.parent if output_path else source_path.parent),config.get('supplier_name','fournisseur'),out.get('Nom',sku),progress=image_progress)
             if urls:
                 out["Images"] = ", ".join(urls)
 

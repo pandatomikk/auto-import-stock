@@ -196,6 +196,8 @@ def select_zip_images(archive, references, identities=(), settings=None):
 
 def finalize_catalogue(session_path, images_zip):
     from .image_webp import optimize_webp, PIPELINE_VERSION
+    from .progress import ConversionProgress
+    import time
     from .shared import image_ok
     import shutil
     import unicodedata
@@ -230,6 +232,8 @@ def finalize_catalogue(session_path, images_zip):
         if not any(selected.values()):
             raise ValueError('Aucune image ne correspond aux produits. Vérifier le format de nom configuré dans le profil, ou utiliser des noms contenant les EAN exacts. La préparation reste disponible ; sélectionner un autre ZIP.')
         total = sum(len(entries) for entries in selected.values())
+        progress = ConversionProgress(total)
+        progress.emit()
         names_by_ref = {}
         for row in rows:
             ref = row[EAN_COLUMN].strip()
@@ -241,6 +245,7 @@ def finalize_catalogue(session_path, images_zip):
             for number, info in enumerate(selected[ref], 1):
                 digest = hashlib.sha256((info.filename + ':' + str(info.CRC) + PIPELINE_VERSION).encode()).hexdigest()[:12]
                 target = images_root / f'{slug}-{number:02d}__{digest}.webp'
+                started = time.monotonic()
                 existing = image_ok(target)
                 if not existing:
                     with tempfile.TemporaryDirectory(prefix='product-image-') as tmp:
@@ -251,7 +256,8 @@ def finalize_catalogue(session_path, images_zip):
                 names.append(target.name)
                 records.append(dict(ean=ref, archive_path=info.filename, filename=target.name,
                                     status='existing' if existing else 'converted'))
-                print('ZPSI_LOCAL_IMAGES ' + json.dumps(dict(done=len(records), total=total)), flush=True)
+                progress.update(time.monotonic() - started, cached=existing)
+                progress.emit()
         for row in rows:
             row['Publié'] = '1'
             row['Images'] = ', '.join(names_by_ref[row[EAN_COLUMN].strip()])

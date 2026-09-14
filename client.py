@@ -252,7 +252,9 @@ class Client(tk.Tk):
     self.workflow_result=json.loads(data[len('ZPSI_WORKFLOW '):]);self.record(data);continue
    if data.startswith('ZPSI_LOCAL_IMAGES '):
     event=json.loads(data[len('ZPSI_LOCAL_IMAGES '):]);self.bar.stop();self.bar.configure(mode='determinate',maximum=max(1,event['total']),value=event['done'])
-    self.stage.set('Préparation · Étape 2 sur 2');self.status.set(f"Photos préparées : {event['done']}/{event['total']}");self.eta.set('');continue
+    from core.progress import format_image_eta
+    self.stage.set('Conversion des images');self.status.set(f"Photos préparées : {event['done']}/{event['total']} · {event.get('cached',0)} déjà prêtes")
+    self.eta.set(format_image_eta(event.get('eta')));continue
    if data.startswith('ZPSI_PROGRESS '):
     self.stage.set('2  Préparation des images')
     event=json.loads(data[len('ZPSI_PROGRESS '):]);self.bar.stop();self.bar.configure(mode='determinate',maximum=max(1,event['total']),value=event['done'])

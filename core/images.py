@@ -72,11 +72,13 @@ def images_for_sku(
     return [base + quote(filename) for filename in matches]
 
 
-def prepare_local_zip_images(zip_path,names,parent,brand,product):
-    import hashlib, tempfile, unicodedata
+def prepare_local_zip_images(zip_path,names,parent,brand,product,progress=None):
+    import hashlib, tempfile, unicodedata, time
     from .image_webp import optimize_webp, PIPELINE_VERSION
     from .shared import image_ok
-    from .progress import preparation_event
+    from .progress import preparation_event, ConversionProgress
+    progress = progress if progress is not None else ConversionProgress(len(names))
+    progress.emit()
     def slug(value):
         value=unicodedata.normalize('NFKD',str(value)).encode('ascii','ignore').decode().lower()
         return re.sub(r'[^a-z0-9]+','-',value).strip('-')[:100] or 'produit'
@@ -89,8 +91,10 @@ def prepare_local_zip_images(zip_path,names,parent,brand,product):
             info=entries[0]
             digest=hashlib.sha256((info.filename+str(info.CRC)+PIPELINE_VERSION).encode()).hexdigest()[:12]
             target=root/(slug(product)+f'-{number:02d}__{digest}.webp')
+            started = time.monotonic()
             cached = image_ok(target)
             preparation_event('Conversion des photos', f'Photo {number}/{len(names)} — {name} : ' + ('déjà prête, réutilisation.' if cached else 'extraction et conversion WebP…'))
+            progress.emit()
             if not cached:
                 import shutil
                 with tempfile.TemporaryDirectory() as tmp:
@@ -98,4 +102,6 @@ def prepare_local_zip_images(zip_path,names,parent,brand,product):
                     with z.open(info) as src,source.open('wb') as dst:shutil.copyfileobj(src,dst)
                     optimize_webp(source,target)
             results.append(target.name)
+            progress.update(time.monotonic() - started, cached=cached)
+            progress.emit()
     return results
