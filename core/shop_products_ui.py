@@ -13,7 +13,8 @@ from core.shop_products import ProductAPI, prepare_csv, import_plan
 
 
 class ProductsDialog(tk.Toplevel):
-    def __init__(self, owner, credentials):
+    def __init__(self, owner, credentials, publication=False):
+        self.publication = publication
         self.api = ProductAPI(credentials)
         super().__init__(owner)
         self.owner = owner
@@ -29,9 +30,9 @@ class ProductsDialog(tk.Toplevel):
         self.protocol('WM_DELETE_WINDOW', self.close)
         box = ttk.Frame(self, padding=20)
         box.pack(fill='both', expand=True)
-        ttk.Label(box, text='Créer des articles depuis un CSV', font=('Arial', 16, 'bold')).pack(anchor='w')
+        ttk.Label(box, text='Publier un lot sur le site' if publication else 'Créer des articles depuis un CSV', font=('Arial', 16, 'bold')).pack(anchor='w')
         ttk.Label(box, text='Boutique : ' + self.api.url, wraplength=850).pack(anchor='w', pady=8)
-        ttk.Label(box, text='Produits simples publiés. Les UGS déjà présentes seront ignorées. Les images et les catégories doivent déjà exister sur le site.', wraplength=850).pack(anchor='w')
+        ttk.Label(box, text=('Choisissez le CSV final du lot. Après contrôle, ses images locales seront envoyées puis ses produits publiés. Les UGS existantes seront ignorées.' if publication else 'Produits simples publiés. Les UGS déjà présentes seront ignorées. Les images et les catégories doivent déjà exister sur le site.'), wraplength=850).pack(anchor='w')
         self.select = ttk.Button(box, text='Choisir et contrôler un CSV…', command=self.choose)
         self.select.pack(anchor='w', pady=12)
         self.mapping_button = ttk.Button(box, text='Revoir les correspondances…', command=self.review_mappings, state='disabled')
@@ -60,7 +61,8 @@ class ProductsDialog(tk.Toplevel):
     def choose(self):
         if self.busy:
             return
-        filename = filedialog.askopenfilename(parent=self, title='CSV WooCommerce à ajouter', filetypes=[('CSV WooCommerce', '*.csv')])
+        from core.lots import lots_directory
+        filename = filedialog.askopenfilename(parent=self, initialdir=str(lots_directory()) if self.publication else '', title='Choisir le CSV final du lot', filetypes=[('CSV WooCommerce', '*.csv')])
         if not filename:
             return
         self.plan = None
@@ -81,7 +83,9 @@ class ProductsDialog(tk.Toplevel):
 
     def apply_mappings(self, choices):
         filename = self.source.get()
-        self.run('plan', lambda: prepare_csv(filename, self.api, self.progress, mappings=choices))
+        from core.shop_publication import prepare_publication
+        prepare = prepare_publication if self.publication else prepare_csv
+        self.run('plan', lambda: prepare(filename, self.api, self.progress, mappings=choices))
 
     def progress(self, text):
         self.events.put(('progress', text))
@@ -107,7 +111,9 @@ class ProductsDialog(tk.Toplevel):
         filename = 'rapport_import_' + datetime.now().strftime('%Y%m%d_%H%M%S') + '_' + uuid.uuid4().hex[:8] + '.json'
         self.report_path = Path(self.plan['source']).parent / filename
         self.detail('Rapport : ' + str(self.report_path))
-        self.run('report', lambda: import_plan(self.plan, self.api, self.report_path, self.progress))
+        from core.shop_publication import publish_plan
+        operation = publish_plan if self.publication else import_plan
+        self.run('report', lambda: operation(self.plan, self.api, self.report_path, self.progress))
 
     def poll(self):
         self.timer = None
@@ -134,7 +140,7 @@ class ProductsDialog(tk.Toplevel):
                     self.table.insert('', 'end', values=(item['line'], item['sku'], item['name'], 'Créer' if item['state'] == 'new' else 'Ignorer : existe'))
                 self.detail('\n'.join(result['errors'] + result.get('warnings', [])) or 'Contrôle terminé. Les données contrôlées seront utilisées telles quelles pour cet envoi.')
                 self.status.set(f"{counts['new']} à créer · {counts['existing']} déjà présents · {len(result['errors'])} erreur(s)")
-                self.send.configure(text=f"Créer et publier les {counts['new']} nouveaux articles", state='normal' if counts['new'] and not result['errors'] else 'disabled')
+                self.send.configure(text=(f"Envoyer {len(result.get('local_files', {}))} images et publier {counts['new']} articles" if self.publication else f"Créer et publier les {counts['new']} nouveaux articles"), state='normal' if counts['new'] and not result['errors'] else 'disabled')
             elif kind == 'report':
                 counts = Counter(item['state'] for item in result['results'])
                 self.status.set(f"{counts['created']} créé(s) · {counts['skipped']} ignoré(s) · {counts['rejected']} refusé(s) · {counts['unconfirmed']} non confirmé(s) · {result['total'] - len(result['results'])} non traité(s)." + (' Envoi arrêté : vérifiez la boutique.' if counts['unconfirmed'] or counts['rejected'] else ''))

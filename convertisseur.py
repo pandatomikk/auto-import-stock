@@ -103,6 +103,7 @@ def main() -> int:
     parser.add_argument("--wc-output", type=Path, help="Chemin du CSV WooCommerce facture final")
     parser.add_argument('--test-images', action='store_true', help='Limiter à 5 images et aux produits associés')
     parser.add_argument('--all-images', action='store_true', help='Télécharger toutes les images correspondantes')
+    parser.add_argument('--lot', action='store_true', help='Regrouper sources et résultats dans un nouveau lot local')
     args = parser.parse_args()
     if args.test_images and args.all_images:parser.error('Choisir test ou toutes les images')
 
@@ -115,6 +116,10 @@ def main() -> int:
             parser.error('--resume-session reprend une préparation existante, sans --supplier, --source ni --output.')
         if not args.images_zip:
             parser.error('La seconde étape nécessite --images-zip.')
+        if args.lot:
+            from core.lots import attach_archive, emit_lot
+            args.images_zip = attach_archive(args.resume_session, args.images_zip)
+            emit_lot(args.resume_session.resolve().parent, args.resume_session.resolve())
         return run_two_pass(session=args.resume_session, images_zip=args.images_zip)
 
     if args.supplier:
@@ -133,6 +138,21 @@ def main() -> int:
 
     import json
     supplier_cfg = json.loads(config.read_text(encoding="utf-8"))
+    if args.lot:
+        from core.lots import create_lot, emit_lot
+        from core.progress import preparation_event
+        preparation_event('Création du lot', 'Copie des sources dans le dossier du lot…')
+        folder, source, archive = create_lot(source, supplier_cfg.get('supplier_name', args.supplier or 'Catalogue'), args.images_zip, args.drive_url)
+        args.images_zip = archive
+        args.output = folder / 'resultats' / (source.stem + '_woocommerce.csv')
+        if workflow_kind(supplier_cfg) == 'invoice':
+            args.output = folder / 'resultats' / (source.stem + '_extraction.csv')
+            args.wc_output = folder / 'resultats' / (source.stem + '_woocommerce.csv')
+            args.download_dir = folder / 'resultats' / 'images_produits'
+        if args.product_rules and args.product_rules.is_file():
+            from core.lots import copy_source
+            copy_source(args.product_rules, folder / 'sources')
+        emit_lot(folder / 'resultats', source)
     if workflow_kind(supplier_cfg) == 'two_pass':
         if args.images_zip:
             parser.error('Préparer d’abord le catalogue sans ZIP, puis utiliser --resume-session avec --images-zip.')

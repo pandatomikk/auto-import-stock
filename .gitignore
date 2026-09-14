@@ -59,3 +59,9 @@ correspondances/
 
 regles-produits/
 sauvegarde_preparation_*/
+
+# Lots locaux et journaux de publication
+auto-import-stock-lots/
+publication_images_*.json
+publication_images_*.lock
+publication_images_*.tmp

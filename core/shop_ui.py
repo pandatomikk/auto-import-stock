@@ -70,13 +70,13 @@ class ShopDialog(tk.Toplevel):
         self.csv_button = ttk.Button(box, text='Importer un CSV d’articles…', command=self.open_products)
         self.csv_button.grid(row=16, column=0, columnspan=2, sticky='w', pady=10)
 
-    def open_products(self):
+    def open_products(self, publication=False):
         if self.busy:
             return
         from core.shop_products_ui import ProductsDialog
         credentials = Credentials(**{key: value.get() for key, value in self.values.items()})
         try:
-            self.products_dialog = ProductsDialog(self, credentials)
+            self.products_dialog = ProductsDialog(self, credentials, publication=publication)
         except ConnectionFailure as exc:
             self.status.set(str(exc))
 

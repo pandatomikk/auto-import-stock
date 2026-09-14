@@ -202,7 +202,7 @@ python3 -m venv .venv
 
 Sous Windows, remplacer `.venv/bin/python` par `.venv\Scripts\python.exe`. Les tests graphiques sont ignorés si aucun écran n’est disponible. Les tests propres à un pack restent avec ce pack.
 
-L’installation Windows complète, les traitements OCR réels et l’import dans une boutique WooCommerce doivent être vérifiés dans leurs environnements cibles. Le projet prépare les fichiers produits et permet un test d’envoi d’image dans WordPress. Il peut créer des produits publiés depuis un CSV contrôlé ; il ne met jamais à jour les produits existants et n’effectue pas encore le parcours complet automatiquement.
+L’installation Windows complète, les traitements OCR réels et l’import dans une boutique WooCommerce doivent être vérifiés dans leurs environnements cibles. Le projet prépare les fichiers produits et permet un test d’envoi d’image dans WordPress. Il peut publier un lot contrôlé en envoyant ses images puis en créant les produits. La préparation et la publication restent deux actions distinctes ; les produits existants ne sont jamais mis à jour.
 
 ## Connexion à la boutique · V0.20
 
@@ -222,7 +222,7 @@ Décochez la mémorisation puis enregistrez pour supprimer le fichier chiffré. 
 
 Utilisez l’adresse définitive du site (avec son sous-dossier éventuel), sans `/wp-admin` ni `/wp-json`. HTTPS et un certificat valide sont requis ; les redirections sont refusées pour protéger les identifiants. Cette première version cible les installations WordPress/WooCommerce exposant les API standard `/wp-json/`.
 
-L’envoi des images par lots et l’enchaînement automatique sources → images WordPress → CSV → création des articles feront l’objet des étapes suivantes. Les mises à jour de produits restent hors du périmètre actuel. L’export CSV actuel reste disponible.
+Le bouton **Publier sur le site** permet désormais d’envoyer les images locales d’un CSV préparé, puis de créer ses nouveaux articles. La préparation reste une action séparée et les mises à jour de produits restent hors du périmètre actuel.
 
 Références : [clés WooCommerce](https://woocommerce.com/document/woocommerce-rest-api/) et [mots de passe d’application WordPress](https://developer.wordpress.org/advanced-administration/security/application-passwords/).
 
@@ -291,3 +291,34 @@ En ligne de commande : `--product-rules /chemin/regles.json` applique les règle
 Le format du nom accepte aussi `{model_upper}` pour le modèle en majuscules, `{color_compact}` pour des couleurs séparées par `/` sans espaces, et `{color_compact_initial_lower}` pour mettre la première couleur en minuscules tout en conservant les suivantes. Ces formats ne changent pas le nom de la catégorie.
 
 Les règles produits incluent un vocabulaire de couleurs italien et anglais vers le français, complété par les couleurs courantes en espagnol et allemand. Les libellés français sont aussi reconnus. Accents, casse et couleurs composées sont gérés. Ce dictionnaire ne prétend pas traduire tous les noms commerciaux : une couleur inconnue reste à renseigner. Vos traductions enregistrées priment sur le dictionnaire commun.
+
+
+### Ranger et publier un lot
+
+Chaque nouvelle préparation lancée depuis le client crée un dossier dans `~/auto-import-stock-lots` (dans le dossier utilisateur sous Windows). Exemple :
+
+```text
+auto-import-stock-lots/
+└── Fournisseur_140926_153000/
+    ├── lot.json
+    ├── sources/
+    │   ├── catalogue.xlsx
+    │   ├── photos.zip
+    │   └── source_images.txt      # lien Drive, si utilisé
+    └── resultats/
+        ├── catalogue_woocommerce.csv
+        ├── images_…/fichiers_webp/
+        ├── …_session.json         # parcours en deux étapes
+        └── …_rapport.json
+```
+
+Les sources sont copiées : les fichiers d’origine sont conservés. Le ZIP récupéré à la seconde étape rejoint le même lot. Les règles de présentation locales sont également copiées si elles existent. Les heures et un suffixe en cas de collision permettent plusieurs traitements le même jour. `AUTO_IMPORT_LOTS_DIR` permet de choisir un autre dossier central. En ligne de commande, ajouter `--lot` active ce rangement ; sans cette option, les chemins habituels sont conservés.
+
+1. Préparez les produits ; **Voir mes fichiers** ouvre les résultats du lot. Pour reprendre après fermeture, choisissez son fichier `*_session.json` avec **Reprendre une préparation…**.
+2. Cliquez sur **Publier sur le site**, puis sélectionnez le CSV final dans `resultats`. Un ancien CSV reste utilisable si ses photos sont dans son dossier ou ses sous-dossiers, ou déjà référencées dans WordPress.
+3. Vérifiez les correspondances de marques et catégories, les erreurs et le nombre d’images/articles. Ce contrôle n’envoie ni image ni produit ; la création éventuelle d’une catégorie reste une action explicite.
+4. Cliquez sur **Envoyer … images et publier … articles**. L’outil envoie les images locales nécessaires aux nouveaux articles, récupère leurs identifiants et URL WordPress, puis crée les produits simples publiés. Les UGS existantes sont ignorées.
+
+Le CSV initial est conservé. Une copie `*_en_ligne.csv` contient les URL des photos envoyées ; le rapport d’import indique les créations effectives. Le CSV en ligne peut exister même si la création des produits s’arrête sur une erreur : le rapport fait foi. Les journaux `publication_images_*.json` sont propres à chaque boutique et permettent de réutiliser les envois confirmés du lot. Ne les supprimez pas pour relancer un import. Une réponse d’envoi perdue bloque la nouvelle tentative jusqu’à vérification de la médiathèque. Après un arrêt brutal, un fichier `.lock` peut subsister : ne le retirer qu’après avoir vérifié qu’aucune publication ne tourne encore. Les images ne sont pas supprimées si un produit échoue.
+
+Les anciens traitements ne sont pas déplacés automatiquement. Sauvegardez le dossier des lots avec vos données métier ; il reste hors du dépôt public.

@@ -17,7 +17,7 @@ class ExampleClientTest(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        pack_env = patch.dict(os.environ, {'AUTO_IMPORT_PRIVATE_DIR':str(self.root / 'empty-pack')})
+        pack_env = patch.dict(os.environ, {'AUTO_IMPORT_PRIVATE_DIR':str(self.root / 'empty-pack'), 'AUTO_IMPORT_LOTS_DIR':str(self.root / 'lots')})
         pack_env.start()
         self.addCleanup(pack_env.stop)
         storage = patch('core.shop_connection.settings_path', return_value=self.root / 'settings/shop.json')
@@ -81,7 +81,7 @@ class ExampleClientTest(unittest.TestCase):
         self.wait_for_worker()
         self.assertIn('CSV final prêt', self.app.stage.get())
         self.assertIn('1 référence(s) sans image', self.app.status.get())
-        self.assertTrue((self.root / 'commande_woocommerce.csv').is_file())
+        self.assertTrue((self.app.folder / 'commande_woocommerce.csv').is_file())
 
     def test_resume_after_reopening_and_switching_supplier(self):
         self.app.start()
@@ -92,7 +92,7 @@ class ExampleClientTest(unittest.TestCase):
         self.app.withdraw()
         self.app.brand.set('demo')
         self.app.brand_changed()
-        self.app.source.set(str(self.source))
+        self.app.source.set(str(session))
         self.assertEqual(self.app.resume_path, session)
         self.app.configs['single']={'supplier_name':'Example single','workflow':{'kind':'catalogue'}}
         self.app.brand.set('single')

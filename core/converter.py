@@ -691,7 +691,7 @@ def convert_catalogue(
                 from .images import prepare_local_zip_images
                 names=images_for_sku(image_context['index'],sku,'')
                 preparation_event('Images de l’article', f'{reference} : {len(names)} photo(s) à vérifier / convertir en WebP.', product_index - 1, len(filtered_rows))
-                urls=prepare_local_zip_images(image_context['zip_path'],names,source_path.parent,config.get('supplier_name','fournisseur'),out.get('Nom',sku))
+                urls=prepare_local_zip_images(image_context['zip_path'],names,(output_path.parent if output_path else source_path.parent),config.get('supplier_name','fournisseur'),out.get('Nom',sku))
             if urls:
                 out["Images"] = ", ".join(urls)
 

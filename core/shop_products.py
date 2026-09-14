@@ -162,11 +162,12 @@ def read_products_csv(path):
 
 
 class Resolver:
-    def __init__(self, api, mappings=None):
+    def __init__(self, api, mappings=None, image_overrides=None):
         self.api = api
         self.cache = {}
         self.mappings = mappings or {}
         self.used_mappings = []
+        self.image_overrides = image_overrides or {}
 
     def all(self, route):
         if route not in self.cache:
@@ -195,10 +196,12 @@ class Resolver:
         return ids
 
     def images(self, value):
-        media = self.all('wp/v2/media')
         result = []
         for location in split_values(value):
             location = location.replace('\\,', ',')
+            if location in self.image_overrides:
+                result.append(dict(self.image_overrides[location])); continue
+            media = self.all('wp/v2/media')
             matches = []
             for image in media:
                 sources = [image.get('source_url', '')]
@@ -290,9 +293,9 @@ def row_payload(row, resolver):
     return payload
 
 
-def prepare_csv(path, api, progress=lambda text: None, mappings=None):
+def prepare_csv(path, api, progress=lambda text: None, mappings=None, image_overrides=None):
     rows = read_products_csv(path)
-    resolver = Resolver(api, mappings)
+    resolver = Resolver(api, mappings, image_overrides)
     plan = {'site': api.url, 'source': str(Path(path).resolve()), 'items': [], 'errors': []}
     seen = set()
     for index, row in rows:

@@ -1,5 +1,5 @@
 """Client de bureau : le moteur tourne dans un processus séparé."""
-import json,os,queue,re,signal,subprocess,sys,threading,time
+import json,os,queue,re,signal,subprocess,sys,threading,time,tempfile
 from pathlib import Path
 from core.profiles import discover_profiles, read_profile, workflow_kind
 import tkinter as tk
@@ -38,7 +38,9 @@ class Client(tk.Tk):
   style.configure('TCheckbutton',padding=6,background='white')
   style.configure('Horizontal.TProgressbar',background='#80509a',troughcolor='#eee8f3',borderwidth=0)
   header=tk.Frame(self,bg='#3c1648',height=120);header.pack(fill='x');header.pack_propagate(False)
-  ttk.Button(header,text='Ma boutique',command=self.open_shop).pack(side='right',padx=24)
+  shop_actions=tk.Frame(header,bg='#3c1648');shop_actions.pack(side='right',padx=24,pady=8)
+  ttk.Button(shop_actions,text='Ma boutique',command=self.open_shop).pack(fill='x',pady=(0,6))
+  ttk.Button(shop_actions,text='Publier sur le site',command=self.publish_lot).pack(fill='x')
   tk.Label(header,text='ZPSI  /  CATALOGUE',bg='#3c1648',fg='#f4c95d',font=('Arial',10,'bold')).pack(anchor='w',padx=32,pady=(18,5))
   tk.Label(header,text='Vos produits, prêts pour la boutique.',bg='#3c1648',fg='white',font=('Arial',23,'bold')).pack(anchor='w',padx=32)
   tk.Label(header,text='Une facture, des images. On prépare le reste.',bg='#3c1648',fg='#ddcde5',font=('Arial',11)).pack(anchor='w',padx=32,pady=5)
@@ -86,6 +88,11 @@ class Client(tk.Tk):
    self.source.set(str(source));self.rebuild_preparation=self.is_two_pass();self.refresh_two_pass()
    self.status.set('Règles enregistrées. Relancez la préparation pour les appliquer ; la préparation précédente sera sauvegardée.')
   ProductRulesDialog(self,self.configs[self.brand.get()],source,rules_path(self.brand.get()),saved)
+ def publish_lot(self):
+  if self.proc:
+   self.status.set('Attendez la fin de la préparation avant de sélectionner le CSV à publier.');return
+  self.open_shop()
+  self.shop_dialog.open_products(publication=True)
  def open_shop(self):
   from core.shop_ui import ShopDialog
   if getattr(self,'shop_dialog',None) is not None and self.shop_dialog.winfo_exists():
@@ -120,6 +127,8 @@ class Client(tk.Tk):
   if value:
    source=Path(value).expanduser()
    candidate=source if source.suffix.lower()=='.json' else session_path_for(source)
+   if source.parent.name=='sources' and (source.parent.parent/'lot.json').is_file():
+    candidate=session_path_for(source,source.parent.parent/'resultats'/(source.stem+'_woocommerce.csv'))
    try:
     data=load_session(candidate)
     if source.suffix.lower()=='.json' or (data['status']=='waiting_images' and data.get('source')==str(source.resolve())):
@@ -184,13 +193,13 @@ class Client(tk.Tk):
   elif workflow_kind(self.configs[self.brand.get()])=='invoice':args+=['--drive-url',self.drive.get().strip(),'--test-images' if self.test.get() else '--all-images']
   elif self.configs[self.brand.get()].get('images',{}).get('mode')=='zip_by_sku':args+=['--images-zip',self.drive.get()]
   from core.product_rules import rules_path
+  args+=['--lot']
   args+=['--product-rules',str(rules_path(self.brand.get()))]
   if getattr(self,'rebuild_preparation',False) and not self.resume_path:args+=['--rebuild-preparation']
   if self.is_two_pass() or not self.web.get() or self.configs[self.brand.get()].get('images',{}).get('mode')=='none':args+=['--no-web-descriptions']
   self.workflow_result=None;self.failure_detail=None
   try:
-   self.diagnostic=self.folder/('diagnostic_'+time.strftime('%Y%m%d_%H%M%S')+'.txt')
-   self.diagnostic.write_text('',encoding='utf-8')
+   with tempfile.NamedTemporaryFile(prefix='auto-stock-',suffix='.txt',delete=False) as log:self.diagnostic=Path(log.name)
   except OSError:
    messagebox.showerror('Dossier inaccessible','Choisissez un fichier dans un dossier où vous pouvez enregistrer les résultats.');return
   self.start_button.configure(state='disabled');self.stop_button.configure(state='normal');self.open_button.configure(state='disabled')
@@ -217,12 +226,20 @@ class Client(tk.Tk):
     self.finish('Arrêté — relance possible, fichiers terminés conservés.' if self.stopped else ('Vos fichiers sont prêts. Vérifiez le rapport avant l’import.' if data==0 else self.failure_detail or 'La préparation n’a pas pu aboutir. Un diagnostic est disponible dans le dossier des résultats.'))
     if result:
      self.rebuild_preparation=False
-     if result['status']=='waiting_images':self.refresh_two_pass(show_status=True)
+     if result['status']=='waiting_images':
+      self.source.set(result['session']);self.refresh_two_pass(show_status=True)
      else:
       self.stage.set('Préparation · CSV final prêt pour WordPress')
       missing=len(result.get('missing_images',[]))
-      self.status.set('CSV final : '+Path(result['final_csv']).name+'. Téléversez les images de '+str(Path(result['images_directory']).name)+'/fichiers_webp dans WordPress, puis importez le CSV. Produits au statut publié.'+(f' Attention : {missing} référence(s) sans image, voir le rapport.' if missing else ''))
+      self.status.set('CSV final : '+Path(result['final_csv']).name+'. Utilisez « Publier sur le site » pour envoyer ce lot.'+(f' Attention : {missing} référence(s) sans image, voir le rapport.' if missing else ''))
     continue
+   if data.startswith('ZPSI_LOT '):
+    event=json.loads(data[len('ZPSI_LOT '):]);self.folder=Path(event['folder'])
+    previous=self.diagnostic;self.diagnostic=self.folder/'diagnostic_preparation.txt'
+    try:
+     self.diagnostic.write_text(previous.read_text(encoding='utf-8'),encoding='utf-8');previous.unlink()
+    except OSError:pass
+    self.source.set(event['source']);self.record(data);continue
    if data.startswith('ZPSI_PREPARATION '):
     event=json.loads(data[len('ZPSI_PREPARATION '):]);self.record(data)
     self.stage.set(event['stage']);self.status.set(event['message']);self.bar.stop()
