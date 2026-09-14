@@ -590,6 +590,9 @@ def convert_catalogue(
             if not info or wc_col not in out:
                 continue
 
+            # Supplier page URLs are not external purchase links for simple products.
+            if logical == 'url' and out.get('Type', 'simple') in ('', 'simple'):
+                continue
             value = source_row.get(info["source"], "")
 
             if logical == "image":

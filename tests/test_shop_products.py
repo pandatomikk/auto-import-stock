@@ -167,3 +167,40 @@ class ProductDialogTests(unittest.TestCase):
                 self.assertTrue(dialog.report_path.exists())
             finally:
                 dialog.close(); owner.destroy()
+
+
+class SupplierURLCompatibilityTests(unittest.TestCase):
+    def test_simple_product_supplier_url_is_not_sent_and_warning_is_visible(self):
+        from core.io import write_csv
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)/'articles.csv'
+            row = {'Type':'simple','UGS':'NEW','Nom':'Article','URL externe':'https://supplier.example/product/123'}
+            write_csv(path, list(row), [row])
+            before = path.read_bytes()
+            api = FakeAPI()
+            plan = prepare_csv(path, api)
+            self.assertEqual(plan['errors'], [])
+            self.assertTrue(any('URL externe' in text for text in plan['warnings']))
+            payload = plan['items'][0]['payload']
+            self.assertEqual(payload['type'], 'simple')
+            self.assertNotIn('external_url', payload)
+            self.assertEqual(path.read_bytes(), before)
+            report = import_plan(plan, api, Path(folder)/'report.json')
+            self.assertEqual(report['results'][0]['state'], 'created')
+
+    def test_external_products_are_still_rejected(self):
+        with self.assertRaises(ConnectionFailure):
+            row_payload({'Type':'external','UGS':'NEW','Nom':'Article','URL externe':'https://supplier.example'}, Resolver(FakeAPI()))
+
+    def test_generator_does_not_turn_supplier_url_into_simple_purchase_link(self):
+        from core.converter import convert_catalogue
+        from core.io import write_csv, read_csv_rows
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = root/'source.csv'
+            write_csv(source, ['Reference','Name','URL'], [{'Reference':'NEW','Name':'Article','URL':'https://supplier.example/product'}])
+            config = root/'profile.json'
+            config.write_text(json.dumps({'supplier_name':'Demo','mapping_only':True,'force_mapping':{'sku':'Reference','name':'Name','url':'URL'},'fixed_values':{'Type':'simple'}}))
+            result = convert_catalogue(source, config, Path(__file__).resolve().parents[1]/'schemas/woocommerce.json', web_descriptions=False)
+            _, rows = read_csv_rows(result.output_path)
+            self.assertEqual(rows[0]['URL externe'], '')

@@ -324,3 +324,5 @@ Le CSV initial est conservé. Une copie `*_en_ligne.csv` contient les URL des ph
 Les anciens traitements ne sont pas déplacés automatiquement. Sauvegardez le dossier des lots avec vos données métier ; il reste hors du dépôt public.
 
 Pendant la conversion des images ZIP, le client affiche le nombre de photos préparées et une estimation du temps restant. La première conversion donne une première estimation ; la moyenne est recalculée toutes les 10 photos. Les images déjà préparées sont comptées dans la progression, mais leur réutilisation ne fausse pas le temps moyen de conversion. Cette durée concerne les images uniquement, pas les descriptions fournisseur ni la publication sur le site.
+
+Les liens fournisseur placés par d’anciennes préparations dans « URL externe » ne bloquent plus la publication de produits simples : ils ne sont pas envoyés et un avertissement les signale. Le CSV original est conservé. Les nouvelles préparations de produits simples ne recopient plus le champ source URL dans cette colonne.

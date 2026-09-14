@@ -222,7 +222,7 @@ class Resolver:
 
 
 def row_payload(row, resolver):
-    used = {'ID', 'Type', 'UGS', 'Nom', 'Publié'}
+    used = {'ID', 'Type', 'UGS', 'Nom', 'Publié', 'URL externe'}
     if row.get('ID') or row.get('Type', 'simple') not in ('', 'simple'):
         raise ConnectionFailure('Création uniquement : ID vide et type simple requis.')
     if not row.get('UGS') or not row.get('Nom') or ',' in row['UGS']:
@@ -320,6 +320,9 @@ def prepare_csv(path, api, progress=lambda text: None, mappings=None, image_over
     plan['correspondences'] = list({(entry['kind'], entry['source'], entry['id']): entry for entry in resolver.used_mappings}.values())
     new = [item for item in plan['items'] if item['state'] == 'new']
     plan['warnings'] = []
+    external_count = sum(bool(row.get('URL externe')) for _, row in rows)
+    if external_count:
+        plan['warnings'].append(f'{external_count} lien(s) dans « URL externe » non envoyé(s) : ces articles sont des produits simples. Les liens restent dans le CSV original.')
     for field, label in [('images', 'image'), ('categories', 'catégorie')]:
         count = sum(not item['payload'].get(field) for item in new)
         if count: plan['warnings'].append(f'{count} nouvel article(s) sans {label}. Vérifiez que ce CSV est bien le résultat de la dernière préparation finalisée.')
