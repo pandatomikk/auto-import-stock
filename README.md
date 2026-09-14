@@ -118,7 +118,7 @@ Une association image doit être univoque. Un ZIP sans correspondance ou une ima
 
 ### Images et reprise
 
-Les images traitées localement sont converties en **WebP, qualité 85**, avec un côté maximal de **1 600 pixels**, sans agrandissement. Les fichiers terminés sont réutilisables après une interruption.
+Les images traitées localement sont converties en **WebP, qualité 85**, avec un côté maximal de **1 600 pixels**, sans déformation ni agrandissement. Les grandes marges des fonds de studio clairs sont recadrées avec une petite marge de sécurité autour du produit ; aucun carré ni bordure ne sont ajoutés. Les fonds colorés ou les bords non uniformément clairs ne sont pas recadrés automatiquement. Les fichiers terminés sont réutilisables après une interruption. Une nouvelle version du traitement génère de nouveaux noms pour éviter de reprendre les anciens cadrages du cache.
 
 Le bouton **Arrêter** termine le processus de travail. La relance réutilise les fichiers disponibles ; ce bouton est distinct de la pause volontaire entre les deux étapes. Éviter les traitements simultanés vers le même dossier.
 

@@ -195,7 +195,7 @@ def select_zip_images(archive, references, identities=(), settings=None):
 
 
 def finalize_catalogue(session_path, images_zip):
-    from .image_webp import optimize_webp
+    from .image_webp import optimize_webp, PIPELINE_VERSION
     from .shared import image_ok
     import shutil
     import unicodedata
@@ -239,7 +239,7 @@ def finalize_catalogue(session_path, images_zip):
             slug = unicodedata.normalize('NFKD', row['Nom']).encode('ascii', 'ignore').decode().lower()
             slug = re.sub(r'[^a-z0-9]+', '-', slug).strip('-')[:100] or ref
             for number, info in enumerate(selected[ref], 1):
-                digest = hashlib.sha256((info.filename + ':' + str(info.CRC)).encode()).hexdigest()[:12]
+                digest = hashlib.sha256((info.filename + ':' + str(info.CRC) + PIPELINE_VERSION).encode()).hexdigest()[:12]
                 target = images_root / f'{slug}-{number:02d}__{digest}.webp'
                 existing = image_ok(target)
                 if not existing:

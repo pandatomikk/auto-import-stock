@@ -74,7 +74,7 @@ def images_for_sku(
 
 def prepare_local_zip_images(zip_path,names,parent,brand,product):
     import hashlib, tempfile, unicodedata
-    from .image_webp import optimize_webp
+    from .image_webp import optimize_webp, PIPELINE_VERSION
     from .shared import image_ok
     from .progress import preparation_event
     def slug(value):
@@ -87,7 +87,7 @@ def prepare_local_zip_images(zip_path,names,parent,brand,product):
             entries=[i for i in z.infolist() if not i.is_dir() and PurePosixPath(i.filename).name==name]
             if len(entries)!=1:raise ValueError('Nom image ambigu dans le ZIP : '+name)
             info=entries[0]
-            digest=hashlib.sha256((info.filename+str(info.CRC)).encode()).hexdigest()[:12]
+            digest=hashlib.sha256((info.filename+str(info.CRC)+PIPELINE_VERSION).encode()).hexdigest()[:12]
             target=root/(slug(product)+f'-{number:02d}__{digest}.webp')
             cached = image_ok(target)
             preparation_event('Conversion des photos', f'Photo {number}/{len(names)} — {name} : ' + ('déjà prête, réutilisation.' if cached else 'extraction et conversion WebP…'))
