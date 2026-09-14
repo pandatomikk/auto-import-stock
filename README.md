@@ -317,7 +317,7 @@ Les sources sont copiées : les fichiers d’origine sont conservés. Le ZIP ré
 1. Préparez les produits ; **Voir mes fichiers** ouvre les résultats du lot. Pour reprendre après fermeture, choisissez son fichier `*_session.json` avec **Reprendre une préparation…**.
 2. Cliquez sur **Publier sur le site**, puis sélectionnez le CSV final dans `resultats`. Un ancien CSV reste utilisable si ses photos sont dans son dossier ou ses sous-dossiers, ou déjà référencées dans WordPress.
 3. Vérifiez les correspondances de marques et catégories, les erreurs et le nombre d’images/articles. Ce contrôle n’envoie ni image ni produit ; la création éventuelle d’une catégorie reste une action explicite.
-4. Cliquez sur **Envoyer … images et publier … articles**. L’outil envoie les images locales nécessaires aux nouveaux articles, récupère leurs identifiants et URL WordPress, puis crée les produits simples publiés. Les UGS existantes sont ignorées.
+4. Cliquez sur **Importer le lot**. L’outil envoie les images locales nécessaires aux nouveaux articles, récupère leurs identifiants et URL WordPress, puis crée les produits simples publiés. Les UGS existantes sont ignorées.
 
 Le CSV initial est conservé. Une copie `*_en_ligne.csv` contient les URL des photos envoyées ; le rapport d’import indique les créations effectives. Le CSV en ligne peut exister même si la création des produits s’arrête sur une erreur : le rapport fait foi. Les journaux `publication_images_*.json` sont propres à chaque boutique et permettent de réutiliser les envois confirmés du lot. Ne les supprimez pas pour relancer un import. Une réponse d’envoi perdue bloque la nouvelle tentative jusqu’à vérification de la médiathèque. Après un arrêt brutal, un fichier `.lock` peut subsister : ne le retirer qu’après avoir vérifié qu’aucune publication ne tourne encore. Les images ne sont pas supprimées si un produit échoue.
 
@@ -326,3 +326,7 @@ Les anciens traitements ne sont pas déplacés automatiquement. Sauvegardez le d
 Pendant la conversion des images ZIP, le client affiche le nombre de photos préparées et une estimation du temps restant. La première conversion donne une première estimation ; la moyenne est recalculée toutes les 10 photos. Les images déjà préparées sont comptées dans la progression, mais leur réutilisation ne fausse pas le temps moyen de conversion. Cette durée concerne les images uniquement, pas les descriptions fournisseur ni la publication sur le site.
 
 Les liens fournisseur placés par d’anciennes préparations dans « URL externe » ne bloquent plus la publication de produits simples : ils ne sont pas envoyés et un avertissement les signale. Le CSV original est conservé. Les nouvelles préparations de produits simples ne recopient plus le champ source URL dans cette colonne.
+
+Le bouton **Importer le lot** reste visible dans la barre fixe en bas de la fenêtre de publication, y compris sur un petit écran. Il lance l’envoi des images puis la création des produits après le contrôle. Le contenu au-dessus dispose de son propre défilement.
+
+Lors de la publication, le suivi estime séparément le temps restant pour l’envoi des images et pour la création des articles. Chaque estimation démarre après le premier envoi réussi, puis la moyenne est recalculée toutes les 10 opérations. Les images réutilisées et les articles ignorés ne faussent pas la moyenne.

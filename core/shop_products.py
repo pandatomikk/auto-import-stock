@@ -7,6 +7,8 @@ import io
 import json
 from pathlib import Path
 import re
+import time
+from core.progress import ConversionProgress, publication_status
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit, unquote
 from urllib.request import Request, build_opener
@@ -336,17 +338,21 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
     def save():
         atomic_write(report_path, json.dumps(report, ensure_ascii=False, indent=2).encode())
     save()  # Verify report storage before any product is created.
+    product_progress = ConversionProgress(sum(item['state'] != 'existing' for item in plan['items']))
     for item in plan['items']:
         record = {k: item[k] for k in ('line', 'sku', 'name')}
         if item['state'] == 'existing':
             record['state'] = 'skipped'
             report['results'].append(record); save()
             continue
-        progress('Création : ' + item['sku'])
+        started = time.monotonic()
+        progress(publication_status('Création des articles', product_progress, item['sku']))
         # Recheck immediately before POST, including when resuming after an interruption.
         if api.existing(item['sku']):
             record['state'] = 'skipped'
             report['results'].append(record); save()
+            product_progress.update(time.monotonic() - started, cached=True)
+            progress(publication_status('Création des articles', product_progress))
             continue
         record['state'] = 'unconfirmed'
         report['results'].append(record); save()
@@ -361,4 +367,6 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
             save()
             break  # No automatic retry of a possibly successful write.
         save()
+        product_progress.update(time.monotonic() - started)
+        progress(publication_status('Création des articles', product_progress))
     return report

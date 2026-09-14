@@ -2,6 +2,8 @@
 import copy
 import hashlib
 import json
+import time
+from core.progress import ConversionProgress, publication_status
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 from PIL import Image
@@ -100,10 +102,13 @@ def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=up
             if previous and previous.get('state') != 'uploaded':
                 raise ConnectionFailure('Envoi précédent non confirmé : ' + Path(filename).name + '. Vérifiez la médiathèque et le journal ' + journal_path.name + ' avant de reprendre ; aucun nouvel envoi automatique.')
         uploaded = {}
+        image_progress = ConversionProgress(len(needed))
         for number, filename in enumerate(sorted(needed), 1):
             key = plan['local_files'][filename]
             previous = journal['images'].get(key)
-            progress(f'Images {number}/{len(needed)} : ' + Path(filename).name)
+            cached = bool(previous)
+            started = time.monotonic()
+            progress(publication_status('Envoi des images', image_progress, Path(filename).name))
             if not previous:
                 journal['images'][key] = {'state': 'unconfirmed', 'filename': Path(filename).name}
                 save()  # Persist BEFORE the network write.
@@ -115,6 +120,8 @@ def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=up
                 journal['images'][key] = previous
                 save()
             uploaded[filename] = previous
+            image_progress.update(time.monotonic() - started, cached=cached)
+            progress(publication_status('Envoi des images', image_progress))
         locations = {}
         for item in prepared['items']:
             for image in item.get('payload', {}).get('images', []):

@@ -93,3 +93,16 @@ class LotsPublicationTests(unittest.TestCase):
         with self.assertRaisesRegex(ConnectionFailure, 'CSV a changé'):
             publish_plan(plan, self.api, self.root/'report.json', uploader=self.upload)
         self.upload.assert_not_called()
+
+
+    def test_publication_reports_separate_image_and_product_estimates(self):
+        from unittest.mock import patch
+        Image.new('RGB', (32,40), 'blue').save(self.image.parent/'other.webp')
+        write_csv(self.csv, ['UGS','Nom','Images'], [{'UGS':'NEW','Nom':'A','Images':'photo.webp'}, {'UGS':'NEW2','Nom':'B','Images':'other.webp'}])
+        plan = prepare_publication(self.csv, self.api)
+        messages = []
+        with patch('core.shop_publication.time.monotonic', side_effect=[0,5,5,10,10,13,13,16]):
+            publish_plan(plan, self.api, self.root/'report.json', progress=messages.append, uploader=self.upload)
+        self.assertTrue(any('Envoi des images : 1/2' in text and '5 s' in text for text in messages))
+        self.assertTrue(any('Création des articles : 1/2' in text and '3 s' in text for text in messages))
+        self.assertIn('Création des articles : 2/2 · étape terminée', messages)

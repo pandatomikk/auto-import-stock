@@ -21,15 +21,30 @@ class ProductsDialog(tk.Toplevel):
         owner.busy = True
         owner.set_controls('disabled')
         self.title('Import CSV · Ajout uniquement')
-        self.geometry('900x680')
+        self.geometry(f'920x{min(740, max(480, self.winfo_screenheight()-90))}')
+        self.minsize(720, 420)
         self.transient(owner)
         self.busy = False
         self.plan = None
         self.events = queue.Queue()
         self.timer = None
         self.protocol('WM_DELETE_WINDOW', self.close)
-        box = ttk.Frame(self, padding=20)
-        box.pack(fill='both', expand=True)
+        footer = ttk.Frame(self, padding=(20, 10, 20, 16))
+        footer.pack(side='bottom', fill='x')
+        self.status = tk.StringVar(value='Le contrôle du CSV ne modifie pas la boutique.')
+        status_label = ttk.Label(footer, textvariable=self.status, wraplength=850)
+        status_label.pack(anchor='w', pady=(0, 8))
+        footer.bind('<Configure>', lambda event: status_label.configure(wraplength=max(200, event.width-40)))
+        self.send = ttk.Button(footer, text='Importer le lot' if publication else 'Créer les nouveaux articles', style='Primary.TButton', state='disabled', command=self.start_import)
+        self.send.pack(anchor='w')
+        canvas = tk.Canvas(self, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self, orient='vertical', command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side='right', fill='y'); canvas.pack(fill='both', expand=True)
+        box = ttk.Frame(canvas, padding=20)
+        window = canvas.create_window((0, 0), window=box, anchor='nw')
+        box.bind('<Configure>', lambda event: canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.bind('<Configure>', lambda event: canvas.itemconfigure(window, width=event.width))
         ttk.Label(box, text='Publier un lot sur le site' if publication else 'Créer des articles depuis un CSV', font=('Arial', 16, 'bold')).pack(anchor='w')
         ttk.Label(box, text='Boutique : ' + self.api.url, wraplength=850).pack(anchor='w', pady=8)
         ttk.Label(box, text=('Choisissez le CSV final du lot. Après contrôle, ses images locales seront envoyées puis ses produits publiés. Les UGS existantes seront ignorées.' if publication else 'Produits simples publiés. Les UGS déjà présentes seront ignorées. Les images et les catégories doivent déjà exister sur le site.'), wraplength=850).pack(anchor='w')
@@ -49,10 +64,6 @@ class ProductsDialog(tk.Toplevel):
         scroll.pack(side='right', fill='y'); self.table.pack(fill='both', expand=True)
         self.details = tk.Text(box, height=6, wrap='word', state='disabled')
         self.details.pack(fill='x')
-        self.status = tk.StringVar(value='Le contrôle du CSV ne modifie pas la boutique.')
-        ttk.Label(box, textvariable=self.status, wraplength=850).pack(anchor='w', pady=8)
-        self.send = ttk.Button(box, text='Créer les nouveaux articles', state='disabled', command=self.start_import)
-        self.send.pack(anchor='w')
 
     def detail(self, text):
         self.details.configure(state='normal'); self.details.delete('1.0', 'end')
@@ -139,8 +150,8 @@ class ProductsDialog(tk.Toplevel):
                 for item in result['items']:
                     self.table.insert('', 'end', values=(item['line'], item['sku'], item['name'], 'Créer' if item['state'] == 'new' else 'Ignorer : existe'))
                 self.detail('\n'.join(result['errors'] + result.get('warnings', [])) or 'Contrôle terminé. Les données contrôlées seront utilisées telles quelles pour cet envoi.')
-                self.status.set(f"{counts['new']} à créer · {counts['existing']} déjà présents · {len(result['errors'])} erreur(s)")
-                self.send.configure(text=(f"Envoyer {len(result.get('local_files', {}))} images et publier {counts['new']} articles" if self.publication else f"Créer et publier les {counts['new']} nouveaux articles"), state='normal' if counts['new'] and not result['errors'] else 'disabled')
+                self.status.set(f"{counts['new']} à créer · {counts['existing']} déjà présents · {len(result['errors'])} erreur(s)" + (f" · {len(result.get('local_files', {}))} images locales" if self.publication else ''))
+                self.send.configure(text=("Importer le lot" if self.publication else f"Créer et publier les {counts['new']} nouveaux articles"), state='normal' if counts['new'] and not result['errors'] else 'disabled')
             elif kind == 'report':
                 counts = Counter(item['state'] for item in result['results'])
                 self.status.set(f"{counts['created']} créé(s) · {counts['skipped']} ignoré(s) · {counts['rejected']} refusé(s) · {counts['unconfirmed']} non confirmé(s) · {result['total'] - len(result['results'])} non traité(s)." + (' Envoi arrêté : vérifiez la boutique.' if counts['unconfirmed'] or counts['rejected'] else ''))

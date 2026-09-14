@@ -64,3 +64,15 @@ def format_image_eta(seconds):
     else:
         duration = f'{seconds // 3600} h {(seconds % 3600) // 60:02d} min'
     return 'Temps restant pour les images : environ ' + duration
+
+
+def publication_status(label, tracker, current=''):
+    event = tracker.snapshot()
+    seconds = event['eta']
+    if seconds is None:
+        estimate = 'estimation après le premier envoi…'
+    elif seconds == 0:
+        estimate = 'étape terminée'
+    else:
+        estimate = format_image_eta(seconds).replace('Temps restant pour les images : ', 'temps restant : ')
+    return f"{label} : {event['done']}/{event['total']} · {estimate}" + (' · ' + current if current else '')
