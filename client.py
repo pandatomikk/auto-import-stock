@@ -14,7 +14,13 @@ if os.name=='nt' and (ROOT/'runtime_windows.json').is_file():
 
 class Client(tk.Tk):
  def __init__(self):
+  if os.name=='nt':
+   import ctypes
+   ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('ZPSI.AutoImportStock')
   super().__init__();self.title('Import fournisseurs — ZPSI · V0.20');self.geometry('960x720');self.minsize(820,680);self.configure(bg='#f4f1f7')
+  self.app_icon=tk.PhotoImage(file=str(ROOT/'assets'/'app.png'))
+  self.iconphoto(True,self.app_icon)
+  if os.name=='nt':self.iconbitmap(str(ROOT/'assets'/'app.ico'))
   from core.shop_connection import initialize_storage
   from core.profiles import private_directory
   initialize_storage()
@@ -74,6 +80,8 @@ class Client(tk.Tk):
   ttk.Label(box,text='Vos fichiers restent sur cet ordinateur. Vous choisissez quand les importer dans la boutique.',foreground='#84768a',wraplength=800,font=('Arial',10)).grid(row=10,column=0,columnspan=3,sticky='w',pady=(22,0))
   self.source.trace_add('write',self.selection_changed)
   self.protocol('WM_DELETE_WINDOW',self.close);self.brand_changed();self.poll_timer=self.after(150,self.poll)
+  from core.update_ui import UpdateController
+  self.update_controller=UpdateController(self,ROOT)
  def open_product_rules(self):
   if self.proc:return
   from core.product_rules import rules_path
@@ -300,11 +308,13 @@ class Client(tk.Tk):
   if sys.platform=='win32':os.startfile(path)
   else:subprocess.Popen(['open' if sys.platform=='darwin' else 'xdg-open',str(path)])
  def destroy(self):
+  if getattr(self,'update_controller',None):self.update_controller.close()
   timer=getattr(self,'poll_timer',None)
   if timer:
    self.after_cancel(timer);self.poll_timer=None
   super().destroy()
  def close(self):
+  if getattr(self,'update_controller',None) and self.update_controller.busy:return
   dialog=getattr(self,'shop_dialog',None)
   if dialog is not None and dialog.winfo_exists() and dialog.busy:
    dialog.lift();dialog.status.set('Attendez le résultat de l’opération avant de fermer l’application.');return

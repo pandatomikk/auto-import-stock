@@ -36,3 +36,14 @@ class InstallerTest(unittest.TestCase):
             self.assertTrue((dest / 'profiles/demo.json').exists())
             self.assertTrue((dest / 'private/profiles').is_dir())
             self.assertTrue((dest / 'private/rules').is_dir())
+
+    def test_application_icon_is_installed(self):
+        from PIL import Image
+        actual = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp)
+            copy_application(actual, target)
+            self.assertEqual((target/'assets/app.png').read_bytes(), (actual/'assets/app.png').read_bytes())
+            with Image.open(target/'assets/app.ico') as icon:
+                self.assertEqual(icon.format, 'ICO')
+                self.assertIn((32, 32), icon.ico.sizes())

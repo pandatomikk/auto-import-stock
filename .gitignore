@@ -65,3 +65,13 @@ auto-import-stock-lots/
 publication_images_*.json
 publication_images_*.lock
 publication_images_*.tmp
+
+# Mise à jour de l’installation
+.updates/
+.runtimes/
+.update.lock
+update_state.json
+update_result.json
+active_runtime.json
+distribution_revision.json
+*.update-tmp

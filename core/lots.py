@@ -50,6 +50,21 @@ def create_lot(source, supplier, images=None, drive_url=None, root=None):
     return folder, source, archive
 
 
+def prepare_lot(source, supplier, images=None, drive_url=None, root=None):
+    source = Path(source).expanduser().resolve()
+    folder = source.parent.parent
+    metadata = folder / 'lot.json'
+    if source.parent.name == 'sources' and metadata.is_file():
+        data = json.loads(metadata.read_text(encoding='utf-8'))
+        if data.get('version') == 1 and data.get('supplier') == supplier:
+            (folder / 'resultats').mkdir(exist_ok=True)
+            archive = copy_source(images, folder / 'sources') if images else None
+            if drive_url:
+                (folder / 'sources' / 'source_images.txt').write_text(drive_url + '\n', encoding='utf-8')
+            return folder, source, archive
+    return create_lot(source, supplier, images, drive_url, root)
+
+
 def attach_archive(session, archive):
     folder = Path(session).resolve().parent.parent
     return copy_source(archive, folder / 'sources') if (folder / 'lot.json').is_file() else Path(archive)

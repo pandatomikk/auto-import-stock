@@ -139,10 +139,10 @@ def main() -> int:
     import json
     supplier_cfg = json.loads(config.read_text(encoding="utf-8"))
     if args.lot:
-        from core.lots import create_lot, emit_lot
+        from core.lots import prepare_lot, emit_lot
         from core.progress import preparation_event
         preparation_event('Création du lot', 'Copie des sources dans le dossier du lot…')
-        folder, source, archive = create_lot(source, supplier_cfg.get('supplier_name', args.supplier or 'Catalogue'), args.images_zip, args.drive_url)
+        folder, source, archive = prepare_lot(source, supplier_cfg.get('supplier_name', args.supplier or 'Catalogue'), args.images_zip, args.drive_url)
         args.images_zip = archive
         args.output = folder / 'resultats' / (source.stem + '_woocommerce.csv')
         if workflow_kind(supplier_cfg) == 'invoice':

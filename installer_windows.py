@@ -5,7 +5,7 @@ from pathlib import Path
 def copy_application(source, target):
     source, target = Path(source), Path(target)
     target.mkdir(parents=True, exist_ok=True)
-    for name in ['client.py', 'lancer.py', 'convertisseur.py', 'requirements.txt', 'README.md', 'LICENSE', 'core', 'schemas', 'profiles']:
+    for name in ['client.py', 'lancer.py', 'convertisseur.py', 'requirements.txt', 'README.md', 'LICENSE', 'core', 'schemas', 'profiles', 'assets']:
         src, dst = source / name, target / name
         if src.is_dir():
             for file in src.rglob('*'):
@@ -106,10 +106,26 @@ def main():
     for location in ['Desktop','Programs']:
         lines+=['Set l = s.CreateShortcut(s.SpecialFolders('+quote(location)+') & "\\ZPSI Catalogue.lnk")',
           'l.TargetPath = '+quote(py.with_name('pythonw.exe')),
-          'l.Arguments = '+quote('"'+str(target/'client.py')+'"'),
-          'l.WorkingDirectory = '+quote(target),'l.Save']
+          'l.Arguments = '+quote('"'+str(target/'lancer.py')+'" --client'),
+          'l.WorkingDirectory = '+quote(target),
+          'l.IconLocation = '+quote(str(target/'assets'/'app.ico')+',0'),'l.Save']
     script.write_text('\n'.join(lines),encoding='utf-16')
     subprocess.run(['cscript.exe','//Nologo',str(script)],check=True)
+    from core.updater import REPOSITORY, write_json
+    revision = None
+    try:
+        if (source / '.git').exists():
+            revision = subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
+        elif (source / 'distribution_revision.json').exists():
+            revision = json.loads((source / 'distribution_revision.json').read_text(encoding='utf-8'))['revision']
+        else:
+            import re
+            match = re.search(r'-([0-9a-f]{40})$', source.name)
+            if match: revision = match[1]
+    except (OSError, ValueError, KeyError, subprocess.CalledProcessError):
+        pass
+    write_json(target / 'update_state.json', {'managed': True, 'repository': REPOSITORY, 'revision': revision})
+    (target / 'active_runtime.json').unlink(missing_ok=True)
     print('Application installee dans '+str(target))
     print('Profils modifiables : '+str(target/'private'/'profiles'))
 if __name__=='__main__':

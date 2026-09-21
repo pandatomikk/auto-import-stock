@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -12,13 +13,20 @@ REQ_FILE = APP_DIR / "requirements.txt"
 CONVERTER = APP_DIR / "convertisseur.py"
 
 def venv_python() -> Path:
+    directory = VENV_DIR
+    pointer = APP_DIR / 'active_runtime.json'
+    if pointer.exists():
+        relative = json.loads(pointer.read_text(encoding='utf-8'))['directory']
+        directory = (APP_DIR / relative).resolve()
+        if not directory.is_relative_to(APP_DIR / '.runtimes'):
+            raise RuntimeError('Environnement de mise à jour invalide.')
     if os.name == "nt":
-        return VENV_DIR / "Scripts" / "python.exe"
-    return VENV_DIR / "bin" / "python"
+        return directory / "Scripts" / "python.exe"
+    return directory / "bin" / "python"
 
 def in_our_venv() -> bool:
     try:
-        return Path(sys.prefix).resolve() == VENV_DIR.resolve()
+        return Path(sys.prefix).resolve() == venv_python().parent.parent.resolve()
     except Exception:
         return False
 
@@ -47,6 +55,9 @@ def dependency_ok(py: Path) -> bool:
     return result.returncode == 0
 
 def main() -> int:
+    if (APP_DIR / '.update.lock').exists():
+        print('Mise à jour en cours. Patientez avant de rouvrir l’application.')
+        return 1
     from core.progress import preparation_event
     preparation_event('Démarrage', 'Vérification de l’environnement Python et des dépendances…')
     global CONVERTER
@@ -81,6 +92,8 @@ def main() -> int:
             return 1
 
     # Relance réelle dans le venv local.
+    if os.name == 'nt' and Path(sys.executable).name.lower() == 'pythonw.exe':
+        py = py.with_name('pythonw.exe')
     os.execv(str(py), [str(py), str(CONVERTER), *sys.argv[1:]])
     return 0
 

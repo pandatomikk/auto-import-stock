@@ -330,3 +330,20 @@ Les liens fournisseur placés par d’anciennes préparations dans « URL extern
 Le bouton **Importer le lot** reste visible dans la barre fixe en bas de la fenêtre de publication, y compris sur un petit écran. Il lance l’envoi des images puis la création des produits après le contrôle. Le contenu au-dessus dispose de son propre défilement.
 
 Lors de la publication, le suivi estime séparément le temps restant pour l’envoi des images et pour la création des articles. Chaque estimation démarre après le premier envoi réussi, puis la moyenne est recalculée toutes les 10 opérations. Les images réutilisées et les articles ignorés ne faussent pas la moyenne.
+
+
+## Mises à jour proposées au démarrage
+
+Les installations Windows créées par l’installateur vérifient la branche `main` du dépôt public `pandatomikk/auto-import-stock` au démarrage. Une nouvelle révision déclenche une proposition ; aucun fichier n’est remplacé sans acceptation. Sans Internet, l’application reste utilisable. Les dossiers de développement contenant `.git` ne sont jamais mis à jour de cette façon.
+
+Après acceptation, l’archive du commit exact est téléchargée et contrôlée. Les dépendances sont installées dans un environnement séparé, puis l’application se ferme, remplace ses fichiers et redémarre. Les fichiers précédents sont sauvegardés dans `.updates/` ; en cas d’erreur pendant le remplacement, ils sont restaurés. L’ancien environnement Python reste disponible. Une coupure brutale du système pendant le remplacement nécessite un contrôle du dossier `.updates/` et de `.update.lock` avant reprise.
+
+Les accès boutique, les correspondances, les règles personnalisées, les lots, le pack `private/` et les outils OCR locaux sont conservés. **Le pack privé ne provient pas de GitHub : ses mises à jour se distribuent séparément avec l’installateur.** Les nouvelles dépendances nécessitent Internet lors de la préparation d’une mise à jour. Les journaux se trouvent dans `.updates/`. Les anciennes sauvegardes et environnements ne sont pas supprimés automatiquement.
+
+Pour équiper une ancienne installation de cette fonction, relancer une fois le nouvel `Installer-Windows.cmd` et utiliser le raccourci qu’il crée. Une copie ZIP sans révision identifiable peut proposer une première synchronisation avec GitHub. Une distribution préparée avec `distribution_revision.json` conserve sa révision de référence.
+
+## Contrôles des factures et reprise
+
+Un montant incohérent, une alerte de lecture ou une référence répétée bloque désormais tout nouvel export du lot facture. Le CSV de contrôle et le rapport permettent de corriger la source ; sélectionner ensuite ce CSV corrigé pour reprendre. Retirer une alerte uniquement après avoir vérifié la ligne : les montants sont recalculés même si la colonne d’alerte a été vidée. Une lecture de PDF incomplète demande également une vérification avant de poursuivre.
+
+Après un arrêt, relancer depuis la source copiée affichée dans l’interface réutilise le même lot et son cache. Sélectionner à nouveau un original extérieur au lot commence un nouveau lot. Les sessions en deux étapes continuent à se reprendre avec leur fichier de session.
