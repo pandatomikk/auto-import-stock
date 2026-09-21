@@ -347,3 +347,12 @@ Pour équiper une ancienne installation de cette fonction, relancer une fois le 
 Un montant incohérent, une alerte de lecture ou une référence répétée bloque désormais tout nouvel export du lot facture. Le CSV de contrôle et le rapport permettent de corriger la source ; sélectionner ensuite ce CSV corrigé pour reprendre. Retirer une alerte uniquement après avoir vérifié la ligne : les montants sont recalculés même si la colonne d’alerte a été vidée. Une lecture de PDF incomplète demande également une vérification avant de poursuivre.
 
 Après un arrêt, relancer depuis la source copiée affichée dans l’interface réutilise le même lot et son cache. Sélectionner à nouveau un original extérieur au lot commence un nouveau lot. Les sessions en deux étapes continuent à se reprendre avec leur fichier de session.
+
+
+## Tester avec cinq produits
+
+La case **Tester avec 5 produits (toutes leurs photos)** sélectionne au maximum les cinq premiers produits retenus du document, après les exclusions et regroupements du profil. Ce mode est disponible pour les catalogues, les préparations en deux étapes et les factures avec un pack compatible. Chaque produit garde toutes ses photos disponibles et sa description ; une photo manquante ne retire pas le produit du test.
+
+Les sorties de test portent le suffixe `_test_5_produits_woocommerce` et sont distinctes du catalogue complet. Pour une préparation en deux étapes, le choix est conservé dans la session et reste fixé jusqu’à sa finalisation. Une fois celle-ci terminée, décocher la case prépare le catalogue complet. Le CSV de test contient au maximum cinq produits : le contrôle de publication présente uniquement ceux de ce fichier.
+
+En ligne de commande, utiliser `--test-products` pour le test et `--all-products` pour le catalogue complet. Les anciens noms `--test-images` et `--all-images` restent acceptés, avec la nouvelle sémantique par produits. Un ancien pack facture qui ne prend pas en charge ce mode demande sa mise à jour, sans lancer un traitement complet par erreur. Le pack privé actualisé doit être installé séparément des mises à jour GitHub.

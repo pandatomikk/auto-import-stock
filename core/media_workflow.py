@@ -71,15 +71,17 @@ def workflow_event(path, data):
                 images_directory=str(path.parent / data.get('image_settings', {}).get('directory', 'images_produits')))
 
 
-def prepare_catalogue(source, config, schema, output=None, rules_path=None, rebuild=False):
+def prepare_catalogue(source, config, schema, output=None, rules_path=None, rebuild=False, product_limit=None):
     source = Path(source).expanduser().resolve()
+    from .sampling import catalogue_output
+    output = output or catalogue_output(source, product_limit)
     config_path = Path(config)
     profile = read_profile(config_path)
     session_path = session_path_for(source, output)
     if session_path.exists():
         previous = load_session(session_path)
         if previous['status'] == 'waiting_images' and not rebuild:
-            if previous.get('source') != str(source) or previous.get('supplier') != config_path.stem:
+            if previous.get('source') != str(source) or previous.get('supplier') != config_path.stem or previous.get('product_limit') != product_limit:
                 raise ValueError('Une autre préparation utilise cette sortie. Choisir un autre nom de CSV.')
             if not (session_path.parent / previous['prepared_csv']).is_file():
                 raise ValueError('CSV de préparation introuvable. Restaurer le fichier avant de reprendre.')
@@ -92,7 +94,7 @@ def prepare_catalogue(source, config, schema, output=None, rules_path=None, rebu
     # Keep an existing preparation intact if the new catalogue fails validation.
     with tempfile.TemporaryDirectory(dir=final.parent, prefix='.preparation-') as tmp:
         staged = Path(tmp) / prepared.name
-        result = convert_catalogue(source, Path(config), Path(schema), staged, web_descriptions=False, product_rules_path=rules_path)
+        result = convert_catalogue(source, Path(config), Path(schema), staged, web_descriptions=False, product_rules_path=rules_path, product_limit=product_limit)
         if not result.row_count:
             raise ValueError('Aucun produit commandé à préparer. Vérifier les quantités et les codes-barres.')
         report = json.loads(result.report_path.read_text(encoding='utf-8'))
@@ -114,7 +116,7 @@ def prepare_catalogue(source, config, schema, output=None, rules_path=None, rebu
         staged_ean.replace(ean_path)
         preparation_report = prepared.with_name(prepared.stem + '_rapport.json')
         result.report_path.replace(preparation_report)
-    data = dict(version=1, workflow='two_pass', supplier=config_path.stem,
+    data = dict(version=1, workflow='two_pass', supplier=config_path.stem, product_limit=product_limit,
                 supplier_name=profile.get('supplier_name', config_path.stem),
                 image_settings=profile.get('images', {}), status='waiting_images', source=str(source),
                 prepared_csv=prepared.name, ean_text=ean_path.name,
@@ -218,6 +220,11 @@ def finalize_catalogue(session_path, images_zip):
         rows = list(reader)
     if not rows:
         raise ValueError('Le CSV de préparation ne contient aucun produit.')
+    limit = data.get('product_limit')
+    from .sampling import validate_limit
+    validate_limit(limit)
+    if limit is not None and len(rows) > limit:
+        raise ValueError(f'Cette préparation de test est limitée à {limit} produits. Préparez un nouveau lot pour le catalogue complet.')
     references = {row[EAN_COLUMN].strip() for row in rows}
     if any(not re.fullmatch(r'\d{8,14}', ref) for ref in references):
         raise ValueError('Code-barres absent ou invalide dans le CSV de préparation.')

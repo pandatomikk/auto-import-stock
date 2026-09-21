@@ -31,6 +31,7 @@ class ExampleClientTest(unittest.TestCase):
         self.source = make_source(self.root / 'commande.xlsx')
         self.app.brand.set('demo')
         self.app.brand_changed()
+        self.app.test.set(False)
         self.app.source.set(str(self.source))
         # Exercise the actual converter process without reinstalling its venv.
         real_popen = subprocess.Popen

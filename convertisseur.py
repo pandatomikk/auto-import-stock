@@ -53,14 +53,14 @@ def choose_source_cli() -> Path:
             return path.resolve()
         print("Fichier introuvable.")
 
-def run_two_pass(source=None, config=None, output=None, session=None, images_zip=None, rules_path=None, rebuild=False):
+def run_two_pass(source=None, config=None, output=None, session=None, images_zip=None, rules_path=None, rebuild=False, product_limit=None):
     import json
     from core.media_workflow import prepare_catalogue, finalize_catalogue, workflow_event
     try:
         if session is not None:
             data = finalize_catalogue(session, images_zip)
         else:
-            session, data = prepare_catalogue(source, config, SCHEMA, output, rules_path=rules_path, rebuild=rebuild)
+            session, data = prepare_catalogue(source, config, SCHEMA, output, rules_path=rules_path, rebuild=rebuild, product_limit=product_limit)
         event = workflow_event(session, data)
         print('ZPSI_WORKFLOW ' + json.dumps(event, ensure_ascii=False), flush=True)
         if data['status'] == 'waiting_images':
@@ -101,18 +101,23 @@ def main() -> int:
     parser.add_argument("--download-workers", type=int, default=4, help="Téléchargements simultanés (1 à 8)")
     parser.add_argument("--refresh-descriptions", action="store_true", help="Relire les fiches facture sans cache")
     parser.add_argument("--wc-output", type=Path, help="Chemin du CSV WooCommerce facture final")
-    parser.add_argument('--test-images', action='store_true', help='Limiter à 5 images et aux produits associés')
-    parser.add_argument('--all-images', action='store_true', help='Télécharger toutes les images correspondantes')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--test-products', '--test-images', dest='test_products', action='store_true', help='Préparer au maximum 5 produits avec toutes leurs photos et descriptions')
+    mode.add_argument('--all-products', '--all-images', dest='all_products', action='store_true', help='Préparer tous les produits')
     parser.add_argument('--lot', action='store_true', help='Regrouper sources et résultats dans un nouveau lot local')
     args = parser.parse_args()
-    if args.test_images and args.all_images:parser.error('Choisir test ou toutes les images')
+    args.product_limit = 5 if args.test_products else None
+    # Compatibility for older full-catalogue invoice adapters.
+    args.test_images = False
+    args.all_images = args.all_products
+    from core.sampling import catalogue_output
 
     print("==========================================")
     print("  CONVERTISSEUR FOURNISSEUR -> WOOCOMMERCE")
     print("==========================================")
 
     if args.resume_session:
-        if args.supplier or args.source or args.output:
+        if args.supplier or args.source or args.output or args.test_products or args.all_products:
             parser.error('--resume-session reprend une préparation existante, sans --supplier, --source ni --output.')
         if not args.images_zip:
             parser.error('La seconde étape nécessite --images-zip.')
@@ -144,10 +149,10 @@ def main() -> int:
         preparation_event('Création du lot', 'Copie des sources dans le dossier du lot…')
         folder, source, archive = prepare_lot(source, supplier_cfg.get('supplier_name', args.supplier or 'Catalogue'), args.images_zip, args.drive_url)
         args.images_zip = archive
-        args.output = folder / 'resultats' / (source.stem + '_woocommerce.csv')
+        args.output = folder / 'resultats' / catalogue_output(source, args.product_limit).name
         if workflow_kind(supplier_cfg) == 'invoice':
             args.output = folder / 'resultats' / (source.stem + '_extraction.csv')
-            args.wc_output = folder / 'resultats' / (source.stem + '_woocommerce.csv')
+            args.wc_output = folder / 'resultats' / catalogue_output(source, args.product_limit).name
             args.download_dir = folder / 'resultats' / 'images_produits'
         if args.product_rules and args.product_rules.is_file():
             from core.lots import copy_source
@@ -156,10 +161,13 @@ def main() -> int:
     if workflow_kind(supplier_cfg) == 'two_pass':
         if args.images_zip:
             parser.error('Préparer d’abord le catalogue sans ZIP, puis utiliser --resume-session avec --images-zip.')
-        return run_two_pass(source, config, args.output, rules_path=args.product_rules, rebuild=args.rebuild_preparation)
+        return run_two_pass(source, config, args.output, rules_path=args.product_rules, rebuild=args.rebuild_preparation, product_limit=args.product_limit)
     if workflow_kind(supplier_cfg) == 'invoice':
         try:
-            return load_adapter(supplier_cfg['workflow']['adapter']).run(args, source, supplier_cfg)
+            adapter = load_adapter(supplier_cfg['workflow']['adapter'])
+            if args.test_products and not getattr(adapter, 'SUPPORTS_PRODUCT_LIMIT', False):
+                raise ValueError('Mettez à jour le pack fournisseur pour utiliser le test de 5 produits. Aucun traitement lancé.')
+            return adapter.run(args, source, supplier_cfg)
         except Exception as exc:
             print(f'ERREUR lecture de facture : {exc}', file=sys.stderr)
             return 1
@@ -197,6 +205,7 @@ def main() -> int:
             images_base_url=images_url,
             web_descriptions=False if args.no_web_descriptions else None,
             product_rules_path=args.product_rules,
+            product_limit=args.product_limit,
         )
     except Exception as exc:
         print(f"ERREUR préparation : {exc}", file=sys.stderr, flush=True)

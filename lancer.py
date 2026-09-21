@@ -17,8 +17,9 @@ def venv_python() -> Path:
     pointer = APP_DIR / 'active_runtime.json'
     if pointer.exists():
         relative = json.loads(pointer.read_text(encoding='utf-8'))['directory']
-        directory = (APP_DIR / relative).resolve()
-        if not directory.is_relative_to(APP_DIR / '.runtimes'):
+        root = APP_DIR.resolve()
+        directory = (root / relative).resolve()
+        if not directory.is_relative_to(root / '.runtimes'):
             raise RuntimeError('Environnement de mise à jour invalide.')
     if os.name == "nt":
         return directory / "Scripts" / "python.exe"

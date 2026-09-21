@@ -63,7 +63,7 @@ class Client(tk.Tk):
   self.two_pass_tools=ttk.Frame(box);self.two_pass_tools.grid(row=4,column=0,columnspan=3,sticky='w',pady=8)
   self.resume_button=ttk.Button(self.two_pass_tools,text='Reprendre une préparation…',command=self.pick_session);self.resume_button.pack(side='left');self.inputs.append(self.resume_button)
   self.ean_button=ttk.Button(self.two_pass_tools,text='Ouvrir la liste EAN',command=self.open_eans);self.ean_button.pack(side='left',padx=8);self.inputs.append(self.ean_button)
-  self.test_widget=ttk.Checkbutton(box,text='Commencer avec 5 images pour essayer',variable=self.test);self.test_widget.grid(row=6,column=1,sticky='w');self.inputs.append(self.test_widget)
+  self.test_widget=ttk.Checkbutton(box,text='Tester avec 5 produits (toutes leurs photos)' ,command=self.test_mode_changed,variable=self.test);self.test_widget.grid(row=6,column=1,sticky='w');self.inputs.append(self.test_widget)
   w=ttk.Checkbutton(box,text='Récupérer les descriptions fournisseur',variable=self.web);w.grid(row=7,column=1,sticky='w');self.inputs.append(w);self.web_widget=w
   actions=ttk.Frame(box);actions.grid(row=8,column=0,columnspan=3,sticky='ew',pady=12)
   self.start_button=ttk.Button(actions,text='Préparer mes produits',style='Primary.TButton',command=self.start);self.start_button.pack(side='left')
@@ -134,13 +134,16 @@ class Client(tk.Tk):
   value=self.source.get().strip()
   if value:
    source=Path(value).expanduser()
-   candidate=source if source.suffix.lower()=='.json' else session_path_for(source)
+   from core.sampling import catalogue_output
+   selected_output=catalogue_output(source,5 if self.test.get() else None)
+   candidate=source if source.suffix.lower()=='.json' else session_path_for(source,selected_output)
    if source.parent.name=='sources' and (source.parent.parent/'lot.json').is_file():
-    candidate=session_path_for(source,source.parent.parent/'resultats'/(source.stem+'_woocommerce.csv'))
+    candidate=session_path_for(source,source.parent.parent/'resultats'/selected_output.name)
    try:
     data=load_session(candidate)
     if source.suffix.lower()=='.json' or (data['status']=='waiting_images' and data.get('source')==str(source.resolve())):
      self.resume_path=candidate.resolve()
+     self.test.set(data.get('product_limit') is not None)
    except (OSError,ValueError):pass
   if getattr(self,'rebuild_preparation',False):self.resume_path=None
   waiting=self.resume_path is not None
@@ -149,13 +152,23 @@ class Client(tk.Tk):
   self.image_entry.configure(state='normal' if waiting else 'disabled')
   self.image_browse.configure(state='normal' if waiting else 'disabled')
   self.image_browse.grid()
-  self.test_widget.configure(state='disabled');self.web_widget.configure(state='disabled')
+  self.test_widget.configure(state='disabled' if waiting and data['status']=='waiting_images' else 'normal');self.web_widget.configure(state='disabled')
   self.ean_button.configure(state='normal' if waiting else 'disabled')
   if waiting:
    self.folder=self.resume_path.parent;self.open_button.configure(state='normal')
   if show_status:
    self.stage.set('En pause · Récupération des images la plateforme fournisseur' if waiting else 'Préparation · Étape 1 sur 2')
    self.status.set('Le CSV et la liste EAN sont prêts. Ouvrez la liste EAN, utilisez-la sur la plateforme fournisseur, téléchargez les photos en ZIP, puis sélectionnez ce ZIP pour finaliser.' if waiting else 'Préparez le CSV et la liste EAN. Vous pourrez ensuite récupérer les photos sur la plateforme fournisseur et reprendre ici.')
+ def test_mode_changed(self):
+  if self.proc:return
+  source=Path(self.source.get()).expanduser()
+  if self.is_two_pass() and source.suffix.lower()=='.json':
+   from core.media_workflow import load_session
+   try:
+    data=load_session(source)
+    self.source.set(data['source'])
+   except (OSError,ValueError):pass
+  self.refresh_two_pass(show_status=True)
  def open_eans(self):
   if not self.resume_path:return
   from core.media_workflow import load_session
@@ -175,7 +188,7 @@ class Client(tk.Tk):
   self.image_label.configure(text='Dossier Google Drive' if is_drive else 'ZIP des images')
   if is_drive:self.image_browse.grid_remove()
   else:self.image_browse.grid()
-  self.test_widget.configure(state='normal' if is_drive else 'disabled')
+  self.test_widget.configure(state='normal')
   no_images=settings.get('mode')=='none'
   if no_images:
    self.image_browse.grid_remove()
@@ -198,8 +211,9 @@ class Client(tk.Tk):
   args=[python_exe,'-u',str(ROOT/'lancer.py'),'--supplier',self.brand.get(),'--source',str(source.resolve())]
   if self.resume_path:
    args=[python_exe,'-u',str(ROOT/'lancer.py'),'--resume-session',str(self.resume_path),'--images-zip',str(Path(self.drive.get()).expanduser().resolve())]
-  elif workflow_kind(self.configs[self.brand.get()])=='invoice':args+=['--drive-url',self.drive.get().strip(),'--test-images' if self.test.get() else '--all-images']
+  elif workflow_kind(self.configs[self.brand.get()])=='invoice':args+=['--drive-url',self.drive.get().strip()]
   elif self.configs[self.brand.get()].get('images',{}).get('mode')=='zip_by_sku':args+=['--images-zip',self.drive.get()]
+  if not self.resume_path:args+=['--test-products' if self.test.get() else '--all-products']
   from core.product_rules import rules_path
   args+=['--lot']
   args+=['--product-rules',str(rules_path(self.brand.get()))]

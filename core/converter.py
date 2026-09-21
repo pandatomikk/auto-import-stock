@@ -503,10 +503,13 @@ def convert_catalogue(
     images_base_url: str | None = None,
     web_descriptions: bool | None = None,
     product_rules_path: Path | None = None,
+    product_limit: int | None = None,
 ) -> ConversionResult:
     """
     Public conversion engine used by the CLI today and a future GUI later.
     """
+    from .sampling import validate_limit, catalogue_output
+    validate_limit(product_limit)
     preparation_event('Configuration', 'Chargement du profil fournisseur et des règles de conversion…')
     config = load_json(supplier_config_path)
     from .product_rules import load_rules, display_values, logical_values
@@ -559,6 +562,10 @@ def convert_catalogue(
         filtered_rows, config, mapping
     )
     issues.extend(duplicate_issues)
+    eligible_count = len(filtered_rows)
+    if product_limit is not None:
+        filtered_rows = filtered_rows[:product_limit]
+        preparation_event("Mode test", f"Test limité à {len(filtered_rows)} produits, avec toutes leurs images et descriptions.")
 
     preparation_event('Lecture des images', ('Indexation de ' + images_zip_path.name + '…') if images_zip_path else 'Aucun ZIP à indexer.')
     image_context = build_zip_image_context(config, images_zip_path, images_base_url)
@@ -714,9 +721,7 @@ def convert_catalogue(
                 "color": str(_logical_value(source_row, "color", mapping) or "").strip(),
             })
 
-    output_path = output_path or source_path.with_name(
-        f"{source_path.stem}_woocommerce.csv"
-    )
+    output_path = output_path or catalogue_output(source_path, product_limit)
     report_path = output_path.with_name(
         f"{output_path.stem}_rapport.json"
     )
@@ -746,6 +751,8 @@ def convert_catalogue(
         "excluded_rows": len(excluded),
         "merged_duplicate_rows": merged_count,
         "output_products": len(converted),
+        "product_limit": product_limit,
+        "eligible_products": eligible_count,
         "ean_text": ean_export,
         "image_identifiers": image_identifiers,
         "mapping": mapping,
