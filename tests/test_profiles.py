@@ -14,7 +14,7 @@ class ProfilesTest(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()
         self.addCleanup(self.folder.cleanup)
-        self.root = Path(self.folder.name)
+        self.root = Path(self.folder.name).resolve()
         setting = patch.dict(os.environ, {'AUTO_IMPORT_PRIVATE_DIR':str(self.root)})
         setting.start()
         self.addCleanup(setting.stop)
@@ -69,7 +69,7 @@ class SupplierDescriptions:
         from core.profiles import APP_DIR
         (self.root / 'adapters').mkdir()
         (self.root / 'adapters/feed.py').write_text('''def read_source(path, options):
-    return ['code','label','amount'], [{'code':path.read_text().strip(),'label':'Demo','amount':12.5}]
+    return ['code','label','amount'], [{'code':path.read_text(encoding='utf-8').strip(),'label':'Demo','amount':12.5}]
 ''')
         source = self.root / 'catalogue.feed'
         source.write_text('ITEM100')

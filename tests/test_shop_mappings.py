@@ -12,12 +12,12 @@ from test_shop_products import FakeAPI
 class MappingTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         patcher = patch('core.shop_mappings.settings_path', return_value=self.root / 'shop.json')
         patcher.start(); self.addCleanup(patcher.stop)
         self.api = FakeAPI()
         self.path = self.root / 'articles.csv'
-        self.path.write_text('UGS,Nom,Marques,Catégories\nABC,Article,Exem,Petits sacs\n')
+        self.path.write_text('UGS,Nom,Marques,Catégories\nABC,Article,Exem,Petits sacs\n', encoding='utf-8')
 
     def test_suggestion_is_not_used_without_confirmed_mapping(self):
         review = prepare_mappings(self.path, self.api)
@@ -37,7 +37,7 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(plan['items'][0]['payload']['categories'], [{'id': 4}])
         self.assertEqual(plan['correspondences'][1]['destination'], 'Exemple')
         self.assertTrue(all(row['state'] == 'Mémorisé' for row in prepare_mappings(self.path, self.api)['rows']))
-        self.assertIn('Exem', self.path.read_text())
+        self.assertIn('Exem', self.path.read_text(encoding='utf-8'))
 
     def test_manual_override_preserves_other_aliases(self):
         save_mappings(self.api.url, {'brands': {'other': 2, 'exem': 3}})
@@ -54,11 +54,11 @@ class MappingTests(unittest.TestCase):
     def test_duplicate_category_names_are_disambiguated_by_path(self):
         terms = [{'id': 1, 'name': 'A', 'parent': 0}, {'id': 2, 'name': 'B', 'parent': 0}, {'id': 3, 'name': 'Sacs', 'parent': 1}, {'id': 4, 'name': 'Sacs', 'parent': 2}]
         self.api.listing = Mock(return_value=terms)
-        self.path.write_text('UGS,Nom,Catégories\nABC,Article,Sacs\n')
+        self.path.write_text('UGS,Nom,Catégories\nABC,Article,Sacs\n', encoding='utf-8')
         review = prepare_mappings(self.path, self.api)
         self.assertIsNone(review['rows'][0]['id'])
         self.assertEqual(review['options']['categories'][4], 'B > Sacs')
-        self.path.write_text('UGS,Nom,Catégories\nABC,Article,A > Sacs\n')
+        self.path.write_text('UGS,Nom,Catégories\nABC,Article,A > Sacs\n', encoding='utf-8')
         self.assertEqual(prepare_mappings(self.path, self.api)['rows'][0]['id'], 3)
 
     def test_corrupt_or_wrong_shop_mapping_is_not_silently_applied(self):

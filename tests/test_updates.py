@@ -15,7 +15,7 @@ class UpdateTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         updater.write_json(self.root / updater.STATE, {'managed': True, 'repository': updater.REPOSITORY, 'revision': 'b' * 40})
 
     def archive(self, extras=None):
@@ -58,10 +58,10 @@ class UpdateTests(unittest.TestCase):
         staging = self.stage()
         updater.apply_update(self.root, staging, self.runtime)
         for name in keep:
-            self.assertEqual((self.root / name).read_text(), 'preserve')
+            self.assertEqual((self.root / name).read_text(encoding='utf-8'), 'preserve')
         self.assertFalse((self.root / 'core/obsolete.py').exists())
-        self.assertEqual(json.loads((self.root / updater.STATE).read_text())['revision'], SHA)
-        self.assertEqual(Path(json.loads((self.root / updater.RUNTIME).read_text())['directory']), Path('.runtimes/test'))
+        self.assertEqual(json.loads((self.root / updater.STATE).read_text(encoding='utf-8'))['revision'], SHA)
+        self.assertEqual(Path(json.loads((self.root / updater.RUNTIME).read_text(encoding='utf-8'))['directory']), Path('.runtimes/test'))
         self.assertFalse((self.root / '.update.lock').exists())
 
     def test_failure_restores_code_and_state(self):
@@ -76,7 +76,7 @@ class UpdateTests(unittest.TestCase):
         with patch.object(updater, 'write_json', side_effect=fail):
             with self.assertRaises(OSError):
                 updater.apply_update(self.root, staging, self.runtime)
-        self.assertEqual((self.root / 'client.py').read_text(), '# old client')
+        self.assertEqual((self.root / 'client.py').read_text(encoding='utf-8'), '# old client')
         self.assertEqual((self.root / updater.STATE).read_bytes(), old_state)
         self.assertFalse((self.root / updater.RUNTIME).exists())
         self.assertFalse((self.root / '.runtimes/test').exists())
@@ -86,7 +86,7 @@ class UpdateTests(unittest.TestCase):
         (self.root / 'client.py').write_text('# old')
         with self.assertRaises(RuntimeError):
             updater.apply_update(self.root, self.stage(), Mock(side_effect=RuntimeError('offline')))
-        self.assertEqual((self.root / 'client.py').read_text(), '# old')
+        self.assertEqual((self.root / 'client.py').read_text(encoding='utf-8'), '# old')
 
     def test_archive_rejects_traversal_and_missing_files(self):
         for payload in [self.archive({'repo/../escape': 'bad'}), self.archive({'repo/core/../../escape': 'bad'})]:
@@ -99,7 +99,7 @@ class UpdateTests(unittest.TestCase):
 
     def test_tampered_plan_cannot_replace_private_files(self):
         staging = self.stage()
-        plan = json.loads((staging / 'plan.json').read_text()); plan['files'].append('private/profiles/customer.json')
+        plan = json.loads((staging / 'plan.json').read_text(encoding='utf-8')); plan['files'].append('private/profiles/customer.json')
         updater.write_json(staging / 'plan.json', plan)
         runtime = Mock()
         with self.assertRaises(updater.UpdateError):
@@ -116,7 +116,7 @@ class UpdateTests(unittest.TestCase):
 class ResumeLotTests(unittest.TestCase):
     def test_retry_uses_same_lot_and_keeps_completed_images(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp); source = root / 'invoice.csv'; source.write_text('data')
+            root = Path(temp).resolve(); source = root / 'invoice.csv'; source.write_text('data')
             first, copied, _ = prepare_lot(source, 'Demo', root=root / 'lots')
             image = first / 'resultats/images_produits/photo.webp'; image.parent.mkdir(); image.write_bytes(b'cached')
             second, source_again, _ = prepare_lot(copied, 'Demo', root=root / 'lots')

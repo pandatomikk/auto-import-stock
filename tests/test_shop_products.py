@@ -40,7 +40,7 @@ class ProductTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.folder = Path(self.temp.name)
+        self.folder = Path(self.temp.name).resolve()
         self.path = self.folder / 'articles.csv'
         self.api = FakeAPI()
 
@@ -69,7 +69,7 @@ class ProductTests(unittest.TestCase):
         self.assertEqual(len(self.api.created), 1)
 
     def test_current_schema_defaults_are_accepted(self):
-        schema = json.loads((Path(__file__).resolve().parents[1] / 'schemas/woocommerce.json').read_text())
+        schema = json.loads((Path(__file__).resolve().parents[1] / 'schemas/woocommerce.json').read_text(encoding='utf-8'))
         row = {key: '' for key in schema['columns']}
         row.update({k: str(v) for k, v in schema['defaults'].items()})
         row.update(UGS='TEST', Nom='Article')
@@ -92,7 +92,7 @@ class ProductTests(unittest.TestCase):
     def test_uncertain_creation_stops_and_persists_report(self):
         plan = prepare_csv(self.csv([{'UGS': 'A', 'Nom': 'A'}, {'UGS': 'B', 'Nom': 'B'}]), self.api)
         def uncertain(payload):
-            self.assertEqual(json.loads((self.folder / 'report.json').read_text())['results'][0]['state'], 'unconfirmed')
+            self.assertEqual(json.loads((self.folder / 'report.json').read_text(encoding='utf-8'))['results'][0]['state'], 'unconfirmed')
             raise ConnectionFailure('Timeout')
         self.api.create = Mock(side_effect=uncertain)
         report = import_plan(plan, self.api, self.folder / 'report.json')

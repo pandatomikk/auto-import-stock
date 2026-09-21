@@ -15,7 +15,7 @@ class LotsPublicationTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.csv = self.root / 'articles.csv'
         self.image = self.root / 'images' / 'photo.webp'
         self.image.parent.mkdir()
@@ -45,8 +45,8 @@ class LotsPublicationTests(unittest.TestCase):
         self.assertEqual(self.upload.call_count, 1)
         self.assertEqual(self.api.created[0]['images'], [{'id': 33}])
         self.assertEqual([r['state'] for r in report['results']], ['created', 'skipped'])
-        self.assertIn('photo-1.webp', (self.root/'articles_en_ligne.csv').read_text())
-        self.assertNotIn('photo-1.webp', self.csv.read_text())
+        self.assertIn('photo-1.webp', (self.root/'articles_en_ligne.csv').read_text(encoding='utf-8'))
+        self.assertNotIn('photo-1.webp', self.csv.read_text(encoding='utf-8'))
 
     def test_confirmed_images_reused_after_product_failure(self):
         plan = prepare_publication(self.csv, self.api)
@@ -89,7 +89,7 @@ class LotsPublicationTests(unittest.TestCase):
 
     def test_csv_changed_after_preview_blocks_all_writes(self):
         plan = prepare_publication(self.csv, self.api)
-        self.csv.write_text(self.csv.read_text() + '\n')
+        self.csv.write_text(self.csv.read_text(encoding='utf-8') + '\n')
         with self.assertRaisesRegex(ConnectionFailure, 'CSV a changé'):
             publish_plan(plan, self.api, self.root/'report.json', uploader=self.upload)
         self.upload.assert_not_called()
