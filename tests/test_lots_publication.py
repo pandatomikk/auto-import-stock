@@ -89,7 +89,7 @@ class LotsPublicationTests(unittest.TestCase):
 
     def test_csv_changed_after_preview_blocks_all_writes(self):
         plan = prepare_publication(self.csv, self.api)
-        self.csv.write_text(self.csv.read_text(encoding='utf-8') + '\n')
+        self.csv.write_text(self.csv.read_text(encoding='utf-8') + '\n', encoding='utf-8')
         with self.assertRaisesRegex(ConnectionFailure, 'CSV a changé'):
             publish_plan(plan, self.api, self.root/'report.json', uploader=self.upload)
         self.upload.assert_not_called()
