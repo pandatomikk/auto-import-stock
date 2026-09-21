@@ -32,7 +32,7 @@ def read_rows(path):
 class ProductSamplingTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.source = make_source(self.root / 'catalogue.csv')
         self.profile = ROOT / 'profiles/demo.json'
 
