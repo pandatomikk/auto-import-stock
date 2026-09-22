@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import json
+import sys
 import lancer
 
 
@@ -11,15 +12,27 @@ class Handoff(Exception):
 
 
 class LauncherTests(unittest.TestCase):
+    def test_windows_handoff_preserves_paths_and_exit_code(self):
+        with tempfile.TemporaryDirectory(prefix='launcher spaces ') as temp:
+            root = Path(temp)
+            script = root / 'echo arguments.py'
+            output = root / 'arguments.json'
+            script.write_text('import json, sys\nfrom pathlib import Path\nPath(sys.argv[1]).write_text(json.dumps(sys.argv[2:]), encoding="utf-8")\nsys.exit(7)\n', encoding='utf-8')
+            args = ['--source', r'C:\Client SARL\LANCASTER\C41SOLEN Cde Hiver 26 détaillée.xlsx', '--images-zip', 'C:/Client SARL/LANCASTER/photos.zip']
+            with patch.object(lancer.os, 'execv', side_effect=AssertionError('Unsafe Windows handoff')):
+                code = lancer.run_program(sys.executable, script, [str(output), *args], platform='nt')
+            self.assertEqual(code, 7)
+            self.assertEqual(json.loads(output.read_text(encoding='utf-8')), args)
+
     def test_client_bootstraps_dependencies_before_handoff(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp).resolve(); env = root / '.venv'
             python = env / ('Scripts/python.exe' if lancer.os.name == 'nt' else 'bin/python')
             python.parent.mkdir(parents=True); python.touch()
-            with patch.object(lancer, 'APP_DIR', root), patch.object(lancer, 'VENV_DIR', env), patch.object(lancer, 'CONVERTER', root/'convertisseur.py'), patch.object(lancer.sys, 'argv', ['lancer.py', '--client']), patch.object(lancer, 'in_our_venv', return_value=False), patch.object(lancer, 'dependency_ok', return_value=False), patch.object(lancer, 'install_dependencies') as install, patch.object(lancer.os, 'execv', side_effect=Handoff) as handoff:
+            with patch.object(lancer, 'APP_DIR', root), patch.object(lancer, 'VENV_DIR', env), patch.object(lancer, 'CONVERTER', root/'convertisseur.py'), patch.object(lancer.sys, 'argv', ['lancer.py', '--client']), patch.object(lancer, 'in_our_venv', return_value=False), patch.object(lancer, 'dependency_ok', return_value=False), patch.object(lancer, 'install_dependencies') as install, patch.object(lancer, 'run_program', side_effect=Handoff) as handoff:
                 with self.assertRaises(Handoff): lancer.main()
                 install.assert_called_once_with(python)
-                self.assertEqual(handoff.call_args.args[1][1], str(root / 'client.py'))
+                self.assertEqual(handoff.call_args.args[1], root / 'client.py')
 
     def test_active_update_runtime_and_escape_rejection(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -12,6 +12,15 @@ VENV_DIR = APP_DIR / ".venv"
 REQ_FILE = APP_DIR / "requirements.txt"
 CONVERTER = APP_DIR / "convertisseur.py"
 
+def run_program(python, script, arguments, platform=None) -> int:
+    argv = [str(python), str(script), *arguments]
+    if (platform or os.name) == 'nt':
+        # Windows execv joins arguments without protecting embedded spaces.
+        # subprocess quotes each argument and preserves the child's exit code.
+        return subprocess.call(argv)
+    os.execv(str(python), argv)
+    return 0
+
 def venv_python() -> Path:
     directory = VENV_DIR
     pointer = APP_DIR / 'active_runtime.json'
@@ -67,7 +76,7 @@ def main() -> int:
         CONVERTER = APP_DIR / 'client.py'
     # Si déjà lancé dans le venv géré par l'application, on va directement au convertisseur.
     if in_our_venv() and dependency_ok(Path(sys.executable)):
-        os.execv(sys.executable, [sys.executable, str(CONVERTER), *sys.argv[1:]])
+        return run_program(sys.executable, CONVERTER, sys.argv[1:])
 
     py = venv_python()
 
@@ -95,8 +104,7 @@ def main() -> int:
     # Relance réelle dans le venv local.
     if os.name == 'nt' and Path(sys.executable).name.lower() == 'pythonw.exe':
         py = py.with_name('pythonw.exe')
-    os.execv(str(py), [str(py), str(CONVERTER), *sys.argv[1:]])
-    return 0
+    return run_program(py, CONVERTER, sys.argv[1:])
 
 if __name__ == "__main__":
     raise SystemExit(main())
