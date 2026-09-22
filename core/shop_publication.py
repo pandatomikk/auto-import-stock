@@ -97,10 +97,26 @@ def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=up
             if item['state'] == 'new' and api.existing(item['sku']):
                 item['state'] = 'existing'; item.pop('payload', None)
             needed.update(image['_local_path'] for image in item.get('payload', {}).get('images', []) if '_local_path' in image)
+        from core.media_library import MediaLibrary
+        progress('Vérification des images déjà présentes dans la médiathèque…')
+        library = MediaLibrary(api) if needed else None
+        resolved = {}
+        for filename in sorted(needed):
+            key = plan['local_files'][filename]
+            previous = journal['images'].get(key)
+            existing = library.find(filename, previous)
+            if existing:
+                resolved[key] = {'state': 'uploaded', **existing}
+                progress('Image existante réutilisée : ' + Path(filename).name)
+            elif previous and previous.get('state') != 'uploaded':
+                raise ConnectionFailure('Envoi précédent non confirmé : ' + Path(filename).name + '. Image introuvable dans la médiathèque ; vérifiez la fin du traitement côté WordPress avant de reprendre. Aucun nouvel envoi automatique.')
+        journal['images'].update(resolved)
+        # A previously confirmed image deleted from WordPress may be uploaded again.
         for filename in needed:
-            previous = journal['images'].get(plan['local_files'][filename])
-            if previous and previous.get('state') != 'uploaded':
-                raise ConnectionFailure('Envoi précédent non confirmé : ' + Path(filename).name + '. Vérifiez la médiathèque et le journal ' + journal_path.name + ' avant de reprendre ; aucun nouvel envoi automatique.')
+            key = plan['local_files'][filename]
+            if key not in resolved and journal['images'].get(key, {}).get('state') == 'uploaded':
+                del journal['images'][key]
+        save()
         uploaded = {}
         image_progress = ConversionProgress(len(needed))
         for number, filename in enumerate(sorted(needed), 1):

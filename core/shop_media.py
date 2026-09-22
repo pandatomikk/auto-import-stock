@@ -34,7 +34,8 @@ def upload_image(credentials, filename):
     except (OSError, ValueError, Image.DecompressionBombError):
         raise ConnectionFailure('Image illisible ou invalide. Sélectionnez un fichier JPEG, PNG ou WebP valide.') from None
     mime, extension = formats[kind]
-    name = re.sub(r'[^a-zA-Z0-9_.-]', '_', Path(filename).stem)[:120] or 'image'
+    from core.media_library import upload_name
+    name = Path(upload_name(filename)).stem
     token = base64.b64encode(f'{username}:{password}'.encode()).decode('ascii')
     request = Request(url + '/wp-json/wp/v2/media', data=data, method='POST', headers={
         'Authorization': 'Basic ' + token,

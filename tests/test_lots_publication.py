@@ -22,8 +22,14 @@ class LotsPublicationTests(unittest.TestCase):
         Image.new('RGB', (32, 40), 'red').save(self.image)
         write_csv(self.csv, ['UGS', 'Nom', 'Images'], [{'UGS': 'NEW', 'Nom': 'Article', 'Images': 'photo.webp'}, {'UGS': 'EXISTING', 'Nom': 'Ancien', 'Images': 'photo.webp'}])
         self.api = FakeAPI()
+        self.media = []
+        original_listing = self.api.listing
+        self.api.listing = lambda route: self.media if route == 'wp/v2/media' else original_listing(route)
         self.api.credentials = object()
-        self.upload = Mock(return_value={'id': 33, 'url': 'https://shop.example/uploads/photo-1.webp', 'filename': 'photo-1.webp'})
+        def upload(*args):
+            self.media.append({'id':33,'source_url':'https://shop.example/uploads/photo-1.webp'})
+            return {'id':33,'url':'https://shop.example/uploads/photo-1.webp','filename':'photo-1.webp'}
+        self.upload = Mock(side_effect=upload)
 
     def test_lot_copies_originals_and_attaches_second_archive(self):
         archive = self.root / 'photos.zip'; archive.write_bytes(b'original')
@@ -106,3 +112,44 @@ class LotsPublicationTests(unittest.TestCase):
         self.assertTrue(any('Envoi des images : 1/2' in text and '5 s' in text for text in messages))
         self.assertTrue(any('Création des articles : 1/2' in text and '3 s' in text for text in messages))
         self.assertIn('Création des articles : 2/2 · étape terminée', messages)
+
+    def test_existing_image_reused_without_upload_or_previous_journal(self):
+        self.media.append({'id':77,'source_url':'https://shop.example/uploads/photo.webp'})
+        plan = prepare_publication(self.csv, self.api)
+        publish_plan(plan, self.api, self.root/'report.json', uploader=self.upload)
+        self.upload.assert_not_called()
+        self.assertEqual(self.api.created[0]['images'], [{'id':77}])
+
+    def test_lost_response_is_reconciled_on_next_attempt(self):
+        plan = prepare_publication(self.csv, self.api)
+        def lost(*args):
+            self.media.append({'id':78,'source_url':'https://shop.example/uploads/photo.webp'})
+            raise ConnectionFailure('Réponse perdue')
+        self.upload.side_effect = lost
+        with self.assertRaises(ConnectionFailure):
+            publish_plan(plan,self.api,self.root/'first.json',uploader=self.upload)
+        publish_plan(plan,self.api,self.root/'second.json',uploader=self.upload)
+        self.assertEqual(self.upload.call_count,1)
+        self.assertEqual(self.api.created[0]['images'],[{'id':78}])
+
+    def test_library_failure_blocks_new_uploads(self):
+        plan=prepare_publication(self.csv,self.api)
+        self.api.listing=Mock(side_effect=ConnectionFailure('Connexion coupée'))
+        with self.assertRaises(ConnectionFailure):
+            publish_plan(plan,self.api,self.root/'report.json',uploader=self.upload)
+        self.upload.assert_not_called()
+
+    def test_ambiguous_existing_images_block_upload(self):
+        self.media.extend([{'id':77,'source_url':'https://shop.example/2025/photo.webp'}, {'id':78,'source_url':'https://shop.example/2026/photo.webp'}])
+        plan=prepare_publication(self.csv,self.api)
+        with self.assertRaisesRegex(ConnectionFailure,'Plusieurs images'):
+            publish_plan(plan,self.api,self.root/'report.json',uploader=self.upload)
+        self.upload.assert_not_called()
+
+    def test_confirmed_but_deleted_media_uploaded_again(self):
+        plan=prepare_publication(self.csv,self.api)
+        self.api.create=Mock(side_effect=ConnectionFailure('API indisponible'))
+        publish_plan(plan,self.api,self.root/'first.json',uploader=self.upload)
+        self.media.clear()
+        publish_plan(plan,self.api,self.root/'second.json',uploader=self.upload)
+        self.assertEqual(self.upload.call_count,2)

@@ -17,3 +17,9 @@ Après succès, fermer puis rouvrir l’application pour charger les profils et 
 En cas de conflit lors d’une première synchronisation, comparer les fichiers indiqués avec le pack fourni : aucune fusion implicite ni écrasement n’est effectué. Sauvegarder et résoudre ces différences avant de relancer.
 
 Les adaptateurs sont du code Python exécuté localement : utiliser uniquement le dépôt du prestataire attendu. Un renommage du dépôt ou une redirection GitHub n’est pas suivi automatiquement avec le jeton ; mettre à jour le nom du dépôt dans la configuration.
+
+## Images déjà présentes dans WordPress
+
+Avant de publier un lot, l’outil relit la médiathèque et réutilise les identifiants des images dont le nom de fichier correspond exactement (y compris les transformations standard de WordPress). Un envoi interrompu est réconcilié lorsqu’une correspondance unique est retrouvée. Cette recherche fonctionne aussi sans journal local, par exemple depuis un autre lot. Une image confirmée dans le journal est réutilisée par son identifiant tant qu’elle existe.
+
+Une correspondance de titre ou de préfixe seule n’est pas suffisante. Plusieurs correspondances interrompent l’envoi. Un envoi non confirmé qui reste introuvable n’est pas retenté automatiquement, car le serveur peut encore être en train de le traiter. Les images déjà existantes sont associées aux nouveaux produits ; le comportement de création des produits reste inchangé.
