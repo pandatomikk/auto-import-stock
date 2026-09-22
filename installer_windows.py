@@ -18,6 +18,10 @@ def copy_application(source, target):
             shutil.copy2(src, dst)
     for name in ['profiles', 'rules', 'adapters']:
         (target / 'private' / name).mkdir(parents=True, exist_ok=True)
+    client_settings = source / 'private' / 'client.json'
+    installed_settings = target / 'private' / 'client.json'
+    if client_settings.is_file() and not installed_settings.exists():
+        shutil.copy2(client_settings, installed_settings)
     # Only operational private content is installed, never tests or backups.
     for name in ['profiles', 'rules', 'adapters']:
         src = source / 'private' / name

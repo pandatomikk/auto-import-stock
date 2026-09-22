@@ -197,6 +197,7 @@ def select_zip_images(archive, references, identities=(), settings=None):
 
 
 def finalize_catalogue(session_path, images_zip):
+    from .client_settings import image_filename
     from .image_webp import optimize_webp, PIPELINE_VERSION
     from .progress import ConversionProgress
     import time
@@ -251,7 +252,7 @@ def finalize_catalogue(session_path, images_zip):
             slug = re.sub(r'[^a-z0-9]+', '-', slug).strip('-')[:100] or ref
             for number, info in enumerate(selected[ref], 1):
                 digest = hashlib.sha256((info.filename + ':' + str(info.CRC) + PIPELINE_VERSION).encode()).hexdigest()[:12]
-                target = images_root / f'{slug}-{number:02d}__{digest}.webp'
+                target = images_root / image_filename(f'{slug}-{number:02d}__{digest}.webp')
                 started = time.monotonic()
                 existing = image_ok(target)
                 if not existing:

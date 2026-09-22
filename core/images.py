@@ -73,6 +73,7 @@ def images_for_sku(
 
 
 def prepare_local_zip_images(zip_path,names,parent,brand,product,progress=None):
+    from .client_settings import image_filename
     import hashlib, tempfile, unicodedata, time
     from .image_webp import optimize_webp, PIPELINE_VERSION
     from .shared import image_ok
@@ -90,7 +91,7 @@ def prepare_local_zip_images(zip_path,names,parent,brand,product,progress=None):
             if len(entries)!=1:raise ValueError('Nom image ambigu dans le ZIP : '+name)
             info=entries[0]
             digest=hashlib.sha256((info.filename+str(info.CRC)+PIPELINE_VERSION).encode()).hexdigest()[:12]
-            target=root/(slug(product)+f'-{number:02d}__{digest}.webp')
+            target=root/image_filename(slug(product)+f'-{number:02d}__{digest}.webp')
             started = time.monotonic()
             cached = image_ok(target)
             preparation_event('Conversion des photos', f'Photo {number}/{len(names)} — {name} : ' + ('déjà prête, réutilisation.' if cached else 'extraction et conversion WebP…'))
