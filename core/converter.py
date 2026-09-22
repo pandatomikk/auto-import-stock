@@ -709,6 +709,11 @@ def convert_catalogue(
             out['Catégories'] = presentation['category']
             if logical_attr == 'color':
                 out['Valeur(s) de l’attribut 1 '] = presentation['color']
+        if config.get('category_classification', {}).get('enabled'):
+            from .category_classification import classify
+            out['Catégories'], category_status = classify(logical_values(source_row, mapping), config['category_classification'])
+            if category_status == 'À vérifier':
+                issues.append(str(out.get('UGS', '')) + ' : ' + out['Catégories'])
         # V5.3 : si un ZIP est fourni, on efface d'abord toute valeur image
         # issue du fichier fournisseur, puis on reconstruit Images UNIQUEMENT
         # avec les fichiers réellement présents dans le ZIP courant.
@@ -762,6 +767,9 @@ def convert_catalogue(
         ean_path.write_text("\n".join(eans) + ("\n" if eans else ""), encoding="utf-8")
         ean_export = {"path": str(ean_path), "count": len(eans)}
     warnings = validate(converted)
+    category_reviews = [{"sku": row.get("UGS", ""), "name": row.get("Nom", ""), "category": row.get("Catégories", "")} for row in converted if str(row.get("Catégories", "")).startswith("À classer : ")]
+    if category_reviews:
+        warnings.append(f"{len(category_reviews)} produit(s) à classer : choisissez leur catégorie dans les correspondances avant import.")
     failed = sum(r["status"] == "fallback" for r in descriptions.records)
     if failed:
         warnings.append(f"{failed} description(s) web non récupérée(s) : descriptions génériques conservées. Voir supplier_descriptions dans le rapport.")
@@ -780,6 +788,7 @@ def convert_catalogue(
         "mapping": mapping,
         "issues": issues,
         "warnings": warnings,
+        "category_reviews": category_reviews,
         "excluded": excluded,
         "supplier_descriptions": descriptions.records,
         "images_zip": str(images_zip_path) if images_zip_path else None,

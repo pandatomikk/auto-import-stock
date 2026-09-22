@@ -170,3 +170,10 @@ class MappingTests(unittest.TestCase):
         finally:
             if dialog.winfo_exists(): dialog.close()
             owner.destroy()
+
+    def test_unclassified_label_requires_choice_and_can_be_remembered(self):
+        self.path.write_text('UGS,Nom,Catégories\nABC,Article,À classer : Sacs\n', encoding='utf-8')
+        review = prepare_mappings(self.path, self.api)
+        self.assertIsNone(review['rows'][0]['id'])
+        save_mappings(self.api.url, {'categories': {source_key('À classer : Sacs'): 4}})
+        self.assertEqual(prepare_mappings(self.path, self.api)['rows'][0]['id'], 4)

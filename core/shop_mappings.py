@@ -93,7 +93,7 @@ def prepare_mappings(filename, api, progress=lambda text: None):
                     exact = [t['id'] for t in terms if comparable(source) == comparable(t.get('name', ''))]
                 chosen = exact[0] if len(exact) == 1 and not stale else None
                 state = 'Exact' if chosen else ('Ancienne destination absente : choisir' if stale else 'À choisir')
-                if chosen is None and not stale:
+                if chosen is None and not stale and not source.startswith('À classer : '):
                     ranked = sorted(((SequenceMatcher(None, comparable(source), comparable(label)).ratio() + (0.3 if comparable(source) and comparable(source) in comparable(label) else 0), id_) for id_, label in labels.items()), reverse=True)
                     if ranked and ranked[0][0] >= 0.5 and (len(ranked) == 1 or ranked[0][0] - ranked[1][0] > 0.05):
                         chosen = ranked[0][1]

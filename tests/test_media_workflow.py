@@ -139,6 +139,19 @@ class ExampleWorkflowTest(unittest.TestCase):
         self.assertTrue(all(row['Publié'] == '-1' for row in rows))
         self.assertFalse(list(self.root.glob('*_session.json')))
 
+    def test_classification_overrides_collection_category(self):
+        config = json.loads((ROOT / 'profiles/demo.json').read_text())
+        config['product_rules'] = {'enabled': True, 'category_template': '{model}'}
+        config['category_classification'] = {'enabled': True, 'rules': [{'source': 'color', 'equals': 'BLACK', 'category': 'Bags'}]}
+        profile = self.root / 'classified.json'
+        profile.write_text(json.dumps(config))
+        result = convert_catalogue(self.source, profile, ROOT / 'schemas/woocommerce.json')
+        rows = read_rows(result.output_path)
+        self.assertEqual(rows[0]['Catégories'], 'Bags')
+        self.assertTrue(rows[1]['Catégories'].startswith('À classer : '))
+        report = json.loads(result.report_path.read_text())
+        self.assertEqual(len(report['category_reviews']), 1)
+
     def test_pending_session_reused_without_rebuilding(self):
         session, data = self.prepare()
         prepared = self.root / data['prepared_csv']
