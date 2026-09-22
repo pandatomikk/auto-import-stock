@@ -9,7 +9,8 @@ from urllib.parse import unquote, urlsplit
 from PIL import Image
 from core.shop_connection import ConnectionFailure
 from core.shop_products import read_products_csv, split_values, prepare_csv, import_plan
-from core.shop_media import upload_image, MAX_BYTES
+from core.shop_media import upload_image, rename_existing_image, MAX_BYTES
+from core.client_settings import rename_existing_media
 from core.io import write_csv
 
 
@@ -65,7 +66,7 @@ def prepare_publication(path, api, progress=lambda text: None, mappings=None):
     return plan
 
 
-def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=upload_image):
+def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=upload_image, renamer=rename_existing_image):
     if plan['errors'] or plan['site'] != api.url:
         raise ConnectionFailure('Contrôle invalide : sélectionnez à nouveau le CSV.')
     source = Path(plan['source'])
@@ -97,15 +98,20 @@ def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=up
             if item['state'] == 'new' and api.existing(item['sku']):
                 item['state'] = 'existing'; item.pop('payload', None)
             needed.update(image['_local_path'] for image in item.get('payload', {}).get('images', []) if '_local_path' in image)
-        from core.media_library import MediaLibrary
+        from core.media_library import MediaLibrary, generated_identity, upload_name, normalized_name
         progress('Vérification des images déjà présentes dans la médiathèque…')
         library = MediaLibrary(api) if needed else None
         resolved = {}
+        rename_enabled = rename_existing_media()
         for filename in sorted(needed):
             key = plan['local_files'][filename]
             previous = journal['images'].get(key)
             existing = library.find(filename, previous)
             if existing:
+                desired = upload_name(filename)
+                if rename_enabled and generated_identity(desired) and normalized_name(existing['filename']) != normalized_name(desired):
+                    progress('Renommage de l’image existante : ' + Path(filename).name)
+                    existing = renamer(api.credentials, existing, filename)
                 resolved[key] = {'state': 'uploaded', **existing}
                 progress('Image existante réutilisée : ' + Path(filename).name)
             elif previous and previous.get('state') != 'uploaded':

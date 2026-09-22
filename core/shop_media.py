@@ -57,3 +57,33 @@ def upload_image(credentials, filename):
         raise ConnectionFailure(message + ' Vérifiez la médiathèque avant de réessayer pour éviter un doublon.') from None
     except (OSError, URLError, ValueError):
         raise ConnectionFailure('Envoi non confirmé : connexion interrompue ou réponse inattendue. Vérifiez la médiathèque avant de réessayer ; l’image a peut-être été créée.') from None
+
+
+def rename_existing_image(credentials, existing, filename):
+    """Rename through the optional ZPSI WordPress plugin; never re-upload on error."""
+    from core.media_library import upload_name
+    token = base64.b64encode(f'{credentials.username.strip()}:{"".join(credentials.application_password.split())}'.encode()).decode('ascii')
+    media_id = existing['id']
+    if type(media_id) is not int or media_id <= 0:
+        raise ConnectionFailure('Identifiant de média invalide.')
+    request = Request(normalize_url(credentials.url) + f'/wp-json/zpsi/v1/media/{media_id}/rename',
+        data=json.dumps({'filename': upload_name(filename), 'expected_url': existing['url']}).encode(), method='POST',
+        headers={'Authorization':'Basic ' + token, 'Content-Type':'application/json', 'Accept':'application/json', 'User-Agent':'AutoImportStock/0.20'})
+    try:
+        with build_opener(NoRedirect()).open(request, timeout=60) as response:
+            raw = response.read(1024 * 1024 + 1)
+        if len(raw) > 1024 * 1024:
+            raise ValueError()
+        result = json.loads(raw)
+        from urllib.parse import urlsplit
+        if not isinstance(result, dict) or result.get('id') != media_id or not isinstance(result.get('url'), str) or urlsplit(result['url']).scheme not in ('http', 'https'):
+            raise ValueError()
+        return {'id': media_id, 'url': result['url'], 'filename': result['filename']}
+    except HTTPError as exc:
+        code = exc.code
+        exc.close()
+        if code == 404:
+            raise ConnectionFailure('Installez et activez l’extension WordPress ZPSI Media pour renommer les images existantes. Aucun nouvel envoi.') from None
+        raise ConnectionFailure(f'Renommage refusé (HTTP {code}). Vérifiez le média et les droits WordPress. Aucun nouvel envoi.') from None
+    except (OSError, URLError, ValueError, KeyError):
+        raise ConnectionFailure('Renommage non confirmé : relancez le contrôle de la médiathèque. Aucun nouvel envoi.') from None

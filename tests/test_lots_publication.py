@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from PIL import Image
 from core.io import write_csv
 from core.lots import create_lot, attach_archive
@@ -13,6 +13,8 @@ from test_shop_products import FakeAPI
 
 class LotsPublicationTests(unittest.TestCase):
     def setUp(self):
+        setting = patch('core.shop_publication.rename_existing_media', return_value=False)
+        setting.start(); self.addCleanup(setting.stop)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
@@ -153,3 +155,37 @@ class LotsPublicationTests(unittest.TestCase):
         self.media.clear()
         publish_plan(plan,self.api,self.root/'second.json',uploader=self.upload)
         self.assertEqual(self.upload.call_count,2)
+
+    def test_new_site_suffix_reuses_old_media_in_product_and_csv(self):
+        name='sac-01__123456789abc-www.example.fr.webp'
+        renamed=self.image.with_name(name); self.image.rename(renamed)
+        write_csv(self.csv,['UGS','Nom','Images'],[{'UGS':'NEW','Nom':'Sac','Images':name}])
+        self.media.append({'id':88,'source_url':'https://shop.example/uploads/sac-01__123456789abc.webp'})
+        plan=prepare_publication(self.csv,self.api)
+        publish_plan(plan,self.api,self.root/'report.json',uploader=self.upload)
+        self.upload.assert_not_called()
+        self.assertEqual(self.api.created[0]['images'],[{'id':88}])
+        self.assertIn('https://shop.example/uploads/sac-01__123456789abc.webp',(self.root/'articles_en_ligne.csv').read_text(encoding='utf-8'))
+
+    def test_rename_preserves_media_id_and_uses_new_url(self):
+        name='sac-01__123456789abc-www.example.fr.webp'
+        self.image.rename(self.image.with_name(name))
+        write_csv(self.csv,['UGS','Nom','Images'],[{'UGS':'NEW','Nom':'Sac','Images':name}])
+        self.media.append({'id':88,'source_url':'https://shop.example/uploads/sac-01__123456789abc.webp'})
+        renamer=Mock(return_value={'id':88,'url':'https://shop.example/uploads/'+name,'filename':name})
+        with patch('core.shop_publication.rename_existing_media', return_value=True):
+            publish_plan(prepare_publication(self.csv,self.api),self.api,self.root/'report.json',uploader=self.upload,renamer=renamer)
+        renamer.assert_called_once()
+        self.upload.assert_not_called()
+        self.assertEqual(self.api.created[0]['images'],[{'id':88}])
+        self.assertIn(name,(self.root/'articles_en_ligne.csv').read_text(encoding='utf-8'))
+
+    def test_rename_failure_never_falls_back_to_upload(self):
+        name='sac-01__123456789abc-www.example.fr.webp'
+        self.image.rename(self.image.with_name(name))
+        write_csv(self.csv,['UGS','Nom','Images'],[{'UGS':'NEW','Nom':'Sac','Images':name}])
+        self.media.append({'id':88,'source_url':'https://shop.example/uploads/sac-01__123456789abc.webp'})
+        with patch('core.shop_publication.rename_existing_media', return_value=True), self.assertRaises(ConnectionFailure):
+            publish_plan(prepare_publication(self.csv,self.api),self.api,self.root/'report.json',uploader=self.upload,renamer=Mock(side_effect=ConnectionFailure('Réponse perdue')))
+        self.upload.assert_not_called()
+        self.assertEqual(self.api.created,[])

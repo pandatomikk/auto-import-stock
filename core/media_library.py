@@ -23,10 +23,18 @@ def normalized_name(name):
     return '.'.join(parts)
 
 
+def generated_identity(name):
+    # Only application-generated names carry the source identifier. Never infer
+    # identity from a product title, colour, or a partial filename alone.
+    match = re.fullmatch(r'(.+-[0-9]+__[0-9a-f]{12})(?:-www\.[a-z0-9.-]+)?\.(webp|jpg|jpeg|png)', normalized_name(name))
+    return (match[1], match[2]) if match else None
+
+
 class MediaLibrary:
     def __init__(self, api):
         self.by_id = {}
         self.by_name = {}
+        self.by_identity = {}
         for item in api.listing('wp/v2/media'):
             if item.get('media_type', 'image') != 'image':
                 continue
@@ -44,6 +52,9 @@ class MediaLibrary:
             self.by_id[item['id']] = record
             for name in names:
                 self.by_name.setdefault(normalized_name(name), {})[item['id']] = record
+                identity = generated_identity(name)
+                if identity:
+                    self.by_identity.setdefault(identity, {})[item['id']] = record
 
     def find(self, filename, previous=None):
         if previous and previous.get('state') == 'uploaded':
@@ -56,6 +67,9 @@ class MediaLibrary:
         matches = {}
         for name in names:
             matches.update(self.by_name.get(normalized_name(name), {}))
+            identity = generated_identity(name)
+            if identity:
+                matches.update(self.by_identity.get(identity, {}))
         if len(matches) > 1:
             raise ConnectionFailure('Plusieurs images existantes correspondent à ' + Path(filename).name + ' : vérifiez la médiathèque avant de reprendre.')
         return next(iter(matches.values()), None)

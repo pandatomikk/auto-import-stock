@@ -50,3 +50,23 @@ class MediaTests(unittest.TestCase):
         with self.assertRaisesRegex(ConnectionFailure, 'maximum'):
             upload_image(self.credentials, self.path)
         opener.assert_not_called()
+
+    @patch('core.shop_media.build_opener')
+    def test_rename_calls_plugin_without_uploading_binary(self, opener):
+        import json
+        from core.shop_media import rename_existing_image
+        opener.return_value.open.return_value.__enter__.return_value.read.return_value=b'{"id":42,"url":"https://shop.example/new.webp","filename":"new.webp"}'
+        result=rename_existing_image(self.credentials,{'id':42,'url':'https://shop.example/old.webp'},self.path)
+        req=opener.return_value.open.call_args.args[0]
+        self.assertTrue(req.full_url.endswith('/wp-json/zpsi/v1/media/42/rename'))
+        self.assertEqual(json.loads(req.data)['expected_url'],'https://shop.example/old.webp')
+        self.assertEqual(result['id'],42)
+        self.assertEqual(opener.return_value.open.call_count,1)
+
+    @patch('core.shop_media.build_opener')
+    def test_lost_rename_response_does_not_retry(self, opener):
+        from core.shop_media import rename_existing_image
+        opener.return_value.open.side_effect=TimeoutError('secret')
+        with self.assertRaisesRegex(ConnectionFailure,'Renommage non confirmé'):
+            rename_existing_image(self.credentials,{'id':42,'url':'https://shop.example/old.webp'},self.path)
+        self.assertEqual(opener.return_value.open.call_count,1)

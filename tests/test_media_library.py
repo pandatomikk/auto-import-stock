@@ -27,3 +27,20 @@ class MediaLibraryTests(unittest.TestCase):
 
     def test_deleted_confirmed_image_not_reused(self):
         self.assertIsNone(self.library([]).find('old.webp',{'state':'uploaded','id':6}))
+
+    def test_site_suffix_does_not_create_a_second_image(self):
+        base='valentino-alexia-noir-01__123456789abc'
+        lib=self.library([{'id':9,'source_url':'https://example.test/'+base+'.webp'}])
+        self.assertEqual(lib.find(base+'-www.example.fr.webp')['id'],9)
+        lib=self.library([{'id':9,'source_url':'https://example.test/'+base+'-www.old.fr_.webp'}])
+        self.assertEqual(lib.find(base+'-www.new.fr.webp')['id'],9)
+
+    def test_different_source_identifier_never_matches(self):
+        lib=self.library([{'id':9,'source_url':'https://example.test/sac-01__123456789abc.webp'}])
+        self.assertIsNone(lib.find('sac-01__abcdefabcdef-www.example.fr.webp'))
+
+    def test_suffix_does_not_hide_existing_duplicates(self):
+        base='sac-01__123456789abc'
+        lib=self.library([{'id':9,'source_url':'https://example.test/'+base+'.webp'}, {'id':10,'source_url':'https://example.test/'+base+'-www.example.fr.webp'}])
+        with self.assertRaisesRegex(ConnectionFailure,'Plusieurs images'):
+            lib.find(base+'-www.example.fr.webp')

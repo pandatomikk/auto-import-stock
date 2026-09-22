@@ -19,3 +19,10 @@ def image_filename(name):
     if image.stem.endswith('-' + suffix):
         return name
     return str(image.with_name(image.stem + '-' + suffix + image.suffix))
+
+
+def rename_existing_media():
+    path = private_directory() / 'client.json'
+    if not path.exists():
+        return False
+    return json.loads(path.read_text(encoding='utf-8')).get('rename_existing_media') is True
