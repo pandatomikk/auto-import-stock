@@ -124,6 +124,21 @@ class ExampleWorkflowTest(unittest.TestCase):
         self.finalize(session, make_zip(self.root / 'photos.zip', [EAN + '.jpg']))
         self.assertTrue(all(row['Publié'] == '-1' for row in read_rows(self.root / data['final_csv'])))
 
+    def test_single_pass_pattern_matches_color_and_keeps_missing_images(self):
+        config = json.loads((ROOT / 'profiles/demo.json').read_text())
+        config['workflow'] = {'kind': 'catalogue'}
+        config['catalogue_draft'] = True
+        profile = self.root / 'single.json'
+        profile.write_text(json.dumps(config))
+        archive = make_zip(self.root / 'photos.zip', ['PHOTO_ITEM100_001_1.jpg'])
+        result = convert_catalogue(self.source, profile, ROOT / 'schemas/woocommerce.json', images_zip_path=archive)
+        rows = read_rows(result.output_path)
+        self.assertEqual(len(rows), 2)
+        self.assertTrue(rows[0]['Images'].endswith('.webp'))
+        self.assertEqual(rows[1]['Images'], '')
+        self.assertTrue(all(row['Publié'] == '-1' for row in rows))
+        self.assertFalse(list(self.root.glob('*_session.json')))
+
     def test_pending_session_reused_without_rebuilding(self):
         session, data = self.prepare()
         prepared = self.root / data['prepared_csv']

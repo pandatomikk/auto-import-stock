@@ -444,9 +444,9 @@ def format_product_name(source_row: dict[str, Any], config: dict, mapping: dict)
     return result
 
 
-def build_zip_image_context(config: dict, zip_path: Path | None, base_url: str | None):
+def build_zip_image_context(config: dict, zip_path: Path | None, base_url: str | None, rows=(), mapping=None):
     settings = config.get("images", {})
-    if settings.get("mode") != "zip_by_sku" or zip_path is None:
+    if settings.get("mode") not in {"zip_by_sku", "zip_pattern"} or zip_path is None:
         return None
 
     extensions = settings.get("extensions", ["png", "jpg", "jpeg", "webp"])
@@ -454,13 +454,35 @@ def build_zip_image_context(config: dict, zip_path: Path | None, base_url: str |
     if not url and settings.get('output_mode') != 'local':
         raise ValueError("Une URL WordPress de base est nécessaire pour les images du ZIP.")
 
+    if settings.get('mode') == 'zip_pattern' and settings.get('output_mode') != 'local':
+        raise ValueError('Les images par motif nécessitent le mode local.')
+    pattern_names = None
+    if settings.get('mode') == 'zip_pattern':
+        from .media_workflow import select_zip_images
+        from pathlib import PurePosixPath
+        import zipfile
+        identities = [dict(ean=clean_identifier(_logical_value(row, 'sku', mapping)),
+                           article=clean_identifier(_logical_value(row, 'model', mapping)),
+                           color_code=str(_logical_value(row, 'color_code', mapping) or ''),
+                           color=str(_logical_value(row, 'color', mapping) or '')) for row in rows]
+        with zipfile.ZipFile(zip_path) as archive:
+            selected, _ = select_zip_images(archive, {i['ean'] for i in identities}, identities, settings)
+        pattern_names = {key: [PurePosixPath(info.filename).name for info in entries]
+                         for key, entries in selected.items()}
     return {
+        "pattern_names": pattern_names,
         "index": index_zip_images(zip_path, extensions),
         "zip_path":zip_path,
         "local":settings.get("output_mode")=="local",
         "config":config,
         "base_url": url,
     }
+
+
+def catalogue_image_names(context, sku):
+    if context.get('pattern_names') is not None:
+        return context['pattern_names'].get(sku, [])
+    return images_for_sku(context['index'], sku, '')
 
 
 def validate(rows: list[dict[str, Any]]) -> list[str]:
@@ -568,7 +590,7 @@ def convert_catalogue(
         preparation_event("Mode test", f"Test limité à {len(filtered_rows)} produits, avec toutes leurs images et descriptions.")
 
     preparation_event('Lecture des images', ('Indexation de ' + images_zip_path.name + '…') if images_zip_path else 'Aucun ZIP à indexer.')
-    image_context = build_zip_image_context(config, images_zip_path, images_base_url)
+    image_context = build_zip_image_context(config, images_zip_path, images_base_url, filtered_rows, mapping)
     if image_context:
         preparation_event('Lecture des images', f"{len(image_context['index'].get('__all__', []))} images trouvées dans le ZIP.")
     fixed = dict(schema.get("defaults", {}))
@@ -580,7 +602,7 @@ def convert_catalogue(
     if image_context and image_context['local'] and 'sku' in mapping:
         from .progress import ConversionProgress
         image_progress = ConversionProgress(sum(
-            len(images_for_sku(image_context['index'], clean_identifier(row.get(mapping['sku']['source'], '')), ''))
+            len(catalogue_image_names(image_context, clean_identifier(row.get(mapping['sku']['source'], ''))))
             for row in filtered_rows))
     converted: list[dict[str, Any]] = []
     image_identifiers = []
@@ -705,7 +727,7 @@ def convert_catalogue(
 
             if image_context['local']:
                 from .images import prepare_local_zip_images
-                names=images_for_sku(image_context['index'],sku,'')
+                names=catalogue_image_names(image_context,sku)
                 preparation_event('Images de l’article', f'{reference} : {len(names)} photo(s) à vérifier / convertir en WebP.', product_index - 1, len(filtered_rows))
                 urls=prepare_local_zip_images(image_context['zip_path'],names,(output_path.parent if output_path else source_path.parent),config.get('supplier_name','fournisseur'),out.get('Nom',sku),progress=image_progress)
             if urls:
