@@ -68,6 +68,11 @@ class ProductTests(unittest.TestCase):
         import_plan(plan, self.api, self.folder / 'report2.json')
         self.assertEqual(len(self.api.created), 1)
 
+    def test_draft_catalogue_remains_unpublished(self):
+        plan = prepare_csv(self.csv([{'UGS': 'NEW', 'Nom': 'Article', 'Publié': '-1', 'En stock ?': '0'}]), self.api)
+        self.assertEqual(plan['errors'], [])
+        self.assertEqual(plan['items'][0]['payload']['status'], 'draft')
+
     def test_current_schema_defaults_are_accepted(self):
         schema = json.loads((Path(__file__).resolve().parents[1] / 'schemas/woocommerce.json').read_text(encoding='utf-8'))
         row = {key: '' for key in schema['columns']}
@@ -77,7 +82,7 @@ class ProductTests(unittest.TestCase):
         self.assertEqual(plan['errors'], [])
 
     def test_errors_block_all_writes(self):
-        for extra in [{'Images': 'missing.webp'}, {'Catégories': 'Inconnue'}, {'Type': 'variable'}, {'ID': '12'}, {'Tarif régulier': 'NaN'}, {'Stock': '2.5'}, {'Publié': '-1'}, {'Custom field': 'do not drop me'}]:
+        for extra in [{'Images': 'missing.webp'}, {'Catégories': 'Inconnue'}, {'Type': 'variable'}, {'ID': '12'}, {'Tarif régulier': 'NaN'}, {'Stock': '2.5'}, {'Publié': 'invalid'}, {'Custom field': 'do not drop me'}]:
             with self.subTest(extra=extra):
                 plan = prepare_csv(self.csv([{'UGS': 'NEW', 'Nom': 'Test', **extra}]), self.api)
                 self.assertTrue(plan['errors'])

@@ -118,6 +118,7 @@ def prepare_catalogue(source, config, schema, output=None, rules_path=None, rebu
         result.report_path.replace(preparation_report)
     data = dict(version=1, workflow='two_pass', supplier=config_path.stem, product_limit=product_limit,
                 supplier_name=profile.get('supplier_name', config_path.stem),
+                catalogue_draft=profile.get('catalogue_draft') is True,
                 image_settings=profile.get('images', {}), status='waiting_images', source=str(source),
                 prepared_csv=prepared.name, ean_text=ean_path.name,
                 preparation_report=preparation_report.name, final_csv=final.name,
@@ -267,10 +268,10 @@ def finalize_catalogue(session_path, images_zip):
                 progress.update(time.monotonic() - started, cached=existing)
                 progress.emit()
         for row in rows:
-            row['Publié'] = '1'
+            row['Publié'] = '-1' if data.get('catalogue_draft') is True else '1'
             row['Images'] = ', '.join(names_by_ref[row[EAN_COLUMN].strip()])
     missing = sorted(ref for ref, names in names_by_ref.items() if not names)
-    report = dict(supplier=data.get('supplier_name', data['supplier']), workflow_status='complete', published=1,
+    report = dict(supplier=data.get('supplier_name', data['supplier']), workflow_status='complete', published=(-1 if data.get('catalogue_draft') is True else 1),
                   prepared_csv=str(prepared), images_zip=str(images_zip), output_products=len(rows),
                   products_with_images=sum(bool(row['Images']) for row in rows),
                   missing_images=missing, ignored_images=ignored, images=records, warnings=validate(rows),

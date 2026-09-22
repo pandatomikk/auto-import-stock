@@ -573,8 +573,8 @@ def convert_catalogue(
         preparation_event('Lecture des images', f"{len(image_context['index'].get('__all__', []))} images trouvées dans le ZIP.")
     fixed = dict(schema.get("defaults", {}))
     fixed.update(config.get("fixed_values", {}))
-    # Publication is the common export policy, including older installed profiles.
-    fixed["Publié"] = 1
+    # Publish by default; explicitly opted-in catalogues without stock may stay drafts.
+    fixed["Publié"] = -1 if config.get("catalogue_draft") is True else 1
 
     image_progress = None
     if image_context and image_context['local'] and 'sku' in mapping:

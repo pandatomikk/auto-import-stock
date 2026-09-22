@@ -114,6 +114,16 @@ class ExampleWorkflowTest(unittest.TestCase):
         self.finalize(session, archive)
         self.assertEqual([p.stat().st_mtime_ns for p in paths], times)
 
+    def test_explicit_catalogue_draft_survives_image_finalization(self):
+        config = json.loads((ROOT / 'profiles/demo.json').read_text())
+        config['catalogue_draft'] = True
+        profile = self.root / 'draft.json'
+        profile.write_text(json.dumps(config))
+        session, data = prepare_catalogue(self.source, profile, ROOT / 'schemas/woocommerce.json')
+        self.assertTrue(all(row['Publié'] == '-1' for row in read_rows(self.root / data['prepared_csv'])))
+        self.finalize(session, make_zip(self.root / 'photos.zip', [EAN + '.jpg']))
+        self.assertTrue(all(row['Publié'] == '-1' for row in read_rows(self.root / data['final_csv'])))
+
     def test_pending_session_reused_without_rebuilding(self):
         session, data = self.prepare()
         prepared = self.root / data['prepared_csv']

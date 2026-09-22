@@ -229,9 +229,9 @@ def row_payload(row, resolver):
         raise ConnectionFailure('Création uniquement : ID vide et type simple requis.')
     if not row.get('UGS') or not row.get('Nom') or ',' in row['UGS']:
         raise ConnectionFailure('Nom et UGS obligatoires ; l’UGS ne doit pas contenir de virgule.')
-    if row.get('Publié', '1') not in ('', '1'):
-        raise ConnectionFailure('Ce test crée des produits publiés : la colonne Publié doit valoir 1.')
-    payload = {'type': 'simple', 'status': 'publish', 'sku': row['UGS'], 'name': row['Nom']}
+    if row.get('Publié', '1') not in ('', '1', '-1'):
+        raise ConnectionFailure('La colonne Publié doit valoir 1 (publié) ou -1 (brouillon).')
+    payload = {'type': 'simple', 'status': ('draft' if row.get('Publié') == '-1' else 'publish'), 'sku': row['UGS'], 'name': row['Nom']}
     texts = {'Description': 'description', 'Description courte': 'short_description', 'GTIN, UPC, EAN ou ISBN': 'global_unique_id', 'Note de commande': 'purchase_note', 'Classe de TVA': 'tax_class', 'Classe d’expédition': 'shipping_class', 'Date de début de promo': 'date_on_sale_from', 'Date de fin de promo': 'date_on_sale_to'}
     for column, field in texts.items():
         used.add(column)
