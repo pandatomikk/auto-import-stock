@@ -12,7 +12,7 @@ Ouvrir **Paramètres → Pack client…**, renseigner le dépôt `compte/dépôt
 
 La synchronisation se déclenche avec **Recevoir les mises à jour**. Elle effectue uniquement des lectures GitHub. Elle valide et télécharge tous les fichiers avant de les appliquer. Elle refuse les conflits avec les modifications locales et conserve les réglages locaux lorsque leur version distante n’a pas changé. Les règles produits personnelles stockées hors du pack ne sont pas touchées.
 
-Après succès, fermer puis rouvrir l’application pour charger les profils et adaptateurs. La mise à jour du moteur suit encore `main` ; elle est indépendante de la branche choisie pour le pack privé.
+Après succès, fermer puis rouvrir l’application pour charger les profils et adaptateurs. La mise à jour du moteur suit `main` par défaut, ou `dev` pour une distribution de test marquée ainsi. Elle est indépendante de la branche choisie pour le pack privé.
 
 En cas de conflit lors d’une première synchronisation, comparer les fichiers indiqués avec le pack fourni : aucune fusion implicite ni écrasement n’est effectué. Sauvegarder et résoudre ces différences avant de relancer.
 

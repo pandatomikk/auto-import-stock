@@ -69,7 +69,10 @@ def check_update(root, fetch=fetch_bytes):
     state = installed_state(root)
     if state is None:
         return None
-    data = json.loads(fetch(f'https://api.github.com/repos/{REPOSITORY}/commits/{BRANCH}', 2_000_000))
+    branch = state.get('branch', BRANCH)
+    if branch not in ('main', 'dev'):
+        raise UpdateError('Branche de mise à jour invalide.')
+    data = json.loads(fetch(f'https://api.github.com/repos/{REPOSITORY}/commits/{branch}', 2_000_000))
     sha = data.get('sha', '')
     if not re.fullmatch('[0-9a-f]{40}', sha):
         raise UpdateError('Version GitHub invalide.')
@@ -155,6 +158,7 @@ def apply_update(root, staging, runtime_builder=build_runtime):
     root, staging = Path(root).resolve(), Path(staging).resolve()
     if installed_state(root) is None or not staging.is_relative_to(root / '.updates'):
         raise UpdateError('Installation ou dossier de mise à jour invalide.')
+    previous_state = installed_state(root)
     plan = json.loads((staging / 'plan.json').read_text(encoding='utf-8'))
     names = plan['files']
     if not re.fullmatch('[0-9a-f]{40}', plan['revision']) or not REQUIRED.issubset(names) or any(not managed(name) for name in names):
@@ -200,7 +204,7 @@ def apply_update(root, staging, runtime_builder=build_runtime):
         changed.append(RUNTIME)
         write_json(root / RUNTIME, {'directory': str(runtime.relative_to(root))})
         changed.append(STATE)
-        write_json(root / STATE, {'managed': True, 'repository': REPOSITORY, 'revision': plan['revision']})
+        write_json(root / STATE, {'managed': True, 'repository': REPOSITORY, 'revision': plan['revision'], 'branch': previous_state.get('branch', BRANCH)})
     except Exception:
         for name in reversed(changed):
             target = root / name

@@ -55,6 +55,11 @@ def copy_application(source, target):
                     continue
             shutil.copy2(file, dest)
 
+    for name in ('.sync-state.json', '.sync-config.json'):
+        src, dst = source / 'private' / name, target / 'private' / name
+        if src.is_file() and (name == '.sync-state.json' or not dst.exists()):
+            shutil.copy2(src, dst)
+
 def find_tool(name):
     existing=shutil.which(name)
     if existing:return Path(existing)
@@ -117,18 +122,22 @@ def main():
     subprocess.run(['cscript.exe','//Nologo',str(script)],check=True)
     from core.updater import REPOSITORY, write_json
     revision = None
+    branch = "main"
     try:
         if (source / '.git').exists():
             revision = subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
+            branch = subprocess.check_output(['git', '-C', str(source), 'branch', '--show-current'], text=True).strip()
         elif (source / 'distribution_revision.json').exists():
-            revision = json.loads((source / 'distribution_revision.json').read_text(encoding='utf-8'))['revision']
+            distribution = json.loads((source / 'distribution_revision.json').read_text(encoding='utf-8'))
+            revision = distribution['revision']
+            branch = distribution.get('branch', 'main')
         else:
             import re
             match = re.search(r'-([0-9a-f]{40})$', source.name)
             if match: revision = match[1]
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError):
         pass
-    write_json(target / 'update_state.json', {'managed': True, 'repository': REPOSITORY, 'revision': revision})
+    write_json(target / 'update_state.json', {'managed': True, 'repository': REPOSITORY, 'revision': revision, 'branch': branch if branch in ('main', 'dev') else 'main'})
     (target / 'active_runtime.json').unlink(missing_ok=True)
     print('Application installee dans '+str(target))
     print('Profils modifiables : '+str(target/'private'/'profiles'))
