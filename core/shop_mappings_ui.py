@@ -90,7 +90,7 @@ class MappingsDialog(tk.Toplevel):
             return
         row = self.review['rows'][int(selection[0])]
         options = self.review['options'][row['kind']]
-        self.create_button.configure(state='normal' if row['kind']=='categories' and not self.creating else 'disabled')
+        self.create_button.configure(text='Nouvelle marque…' if row['kind']=='brands' else 'Nouvelle catégorie…', state='disabled' if self.creating else 'normal')
         if row['kind'] == 'brands':
             self.group_label.configure(text='Marque WooCommerce')
             self.group_ids = [None] + sorted(options, key=lambda key: (options[key].casefold(), key))
@@ -158,17 +158,17 @@ class MappingsDialog(tk.Toplevel):
     def create_category(self):
         if self.creating or not self.table.selection():return
         index = int(self.table.selection()[0])
-        if self.review['rows'][index]['kind'] != 'categories':return
+        kind = self.review['rows'][index]['kind']
         parent = self.group_ids[self.group.current()] or 0
-        label = self.review['options']['categories'].get(parent, 'Racine de la boutique')
-        name = simpledialog.askstring('Nouvelle catégorie', 'Créer une catégorie dans : ' + label + '\nNom de la nouvelle catégorie :', parent=self)
+        label = self.review['options'].get('categories', {}).get(parent, 'Racine de la boutique')
+        name = simpledialog.askstring('Nouvelle marque' if kind == 'brands' else 'Nouvelle catégorie', 'Nom de la marque à créer dans WooCommerce :' if kind == 'brands' else 'Créer une catégorie dans : ' + label + '\nNom de la nouvelle catégorie :', parent=self)
         if not name or not name.strip():return
         name = name.strip()
         self.creating = True
         self.create_button.configure(state='disabled');self.apply_button.configure(state='disabled')
-        self.status.set('Création de la catégorie sur la boutique…')
+        self.status.set('Création de la marque sur la boutique…' if kind == 'brands' else 'Création de la catégorie sur la boutique…')
         def worker():
-            try:self.category_events.put((index, self.owner.api.create_category(name, parent=parent), None))
+            try:self.category_events.put((index, (self.owner.api.create_brand(name) if kind == 'brands' else self.owner.api.create_category(name, parent=parent)), None))
             except ConnectionFailure as exc:self.category_events.put((index, None, str(exc)))
             except Exception:self.category_events.put((index, None, 'Création non confirmée. Rechargez les correspondances avant de réessayer.'))
         threading.Thread(target=worker,daemon=True).start()
@@ -183,16 +183,21 @@ class MappingsDialog(tk.Toplevel):
         self.apply_button.configure(state='normal')
         if error:self.status.set(error)
         else:
-            parents = dict(self.parents())
-            parent = result.get('parent', 0)
-            parents[result['id']] = parent
-            self.review['category_parents'] = parents
-            prefix = self.review['options']['categories'].get(parent, '')
+            row = self.review['rows'][index]
+            kind = row['kind']
             import html
-            self.review['options']['categories'][result['id']] = (prefix + ' > ' if prefix else '') + html.unescape(result['name'])
-            row=self.review['rows'][index];row.update(id=result['id'],state='Catégorie disponible')
+            label = html.unescape(result['name'])
+            if kind == 'categories':
+                parents = dict(self.parents())
+                parent = result.get('parent', 0)
+                parents[result['id']] = parent
+                self.review['category_parents'] = parents
+                prefix = self.review['options']['categories'].get(parent, '')
+                label = (prefix + ' > ' if prefix else '') + label
+            self.review['options'][kind][result['id']] = label
+            row.update(id=result['id'], state='Marque disponible' if kind == 'brands' else 'Catégorie disponible')
             self.table.item(str(index),values=self.row_values(row))
-            self.status.set('Catégorie prête. Validez les correspondances pour continuer.')
+            self.status.set('Marque prête. Validez les correspondances pour continuer.' if kind == 'brands' else 'Catégorie prête. Validez les correspondances pour continuer.')
         self.selected()
 
     def close(self):

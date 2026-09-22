@@ -55,6 +55,22 @@ class ExampleClientTest(unittest.TestCase):
             time.sleep(.01)
         self.assertIsNone(self.app.proc, 'Le processus ne termine pas')
 
+    def test_single_pass_pattern_forwards_selected_zip(self):
+        self.app.configs['demo']['workflow'] = {'kind': 'catalogue'}
+        import json
+        pack = self.root / 'empty-pack' / 'profiles'
+        pack.mkdir(parents=True, exist_ok=True)
+        (pack / 'demo.json').write_text(json.dumps(self.app.configs['demo']))
+        self.app.brand_changed()
+        self.app.drive.set(str(make_zip(self.root / 'photos.zip', ['PHOTO_ITEM100_001.jpg'])))
+        self.app.start()
+        self.wait_for_worker()
+        self.assertIsNone(self.app.resume_path)
+        import csv
+        with (self.app.folder / 'commande_woocommerce.csv').open(encoding='utf-8-sig') as stream:
+            rows = list(csv.DictReader(stream))
+        self.assertTrue(rows[0]['Images'].endswith('.webp'))
+
     def test_pause_retry_and_finalize(self):
         self.assertIn('1 ·', self.app.start_button['text'])
         self.assertEqual(str(self.app.image_entry['state']), 'disabled')

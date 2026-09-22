@@ -127,3 +127,46 @@ class MappingTests(unittest.TestCase):
         with patch.object(api, 'listing', return_value=terms), patch.object(api, 'request') as request:
             with self.assertRaises(ConnectionFailure):api.create_category('Sacs', parent=999)
             request.assert_not_called()
+
+    def test_create_brand_or_reuse_without_duplicate(self):
+        from core.shop_products import ProductAPI
+        from core.shop_connection import Credentials
+        api = ProductAPI(Credentials('https://shop.example', consumer_key='k', consumer_secret='s'))
+        with patch.object(api, 'listing', return_value=[]), patch.object(api, 'request', return_value={'id': 9, 'name': 'Test & Co'}) as request:
+            self.assertEqual(api.create_brand(' Test & Co ')['id'], 9)
+            request.assert_called_once_with('wc/v3/products/brands', payload={'name': 'Test & Co'})
+        with patch.object(api, 'listing', return_value=[{'id': 9, 'name': 'Test &amp; Co'}]), patch.object(api, 'request') as request:
+            self.assertEqual(api.create_brand('test & co')['id'], 9)
+            request.assert_not_called()
+        with patch.object(api, 'listing', return_value=[]), patch.object(api, 'request', return_value={}):
+            with self.assertRaisesRegex(ConnectionFailure, 'non confirmée'):
+                api.create_brand('Test')
+
+    def test_brand_creation_selects_new_destination(self):
+        import tkinter as tk
+        import time
+        from core.shop_mappings_ui import MappingsDialog
+        try: owner = tk.Tk()
+        except tk.TclError: self.skipTest('Display unavailable')
+        owner.withdraw(); owner.select = Mock(); owner.mapping_button = Mock()
+        owner.api = Mock()
+        owner.api.create_brand.return_value = {'id': 12, 'name': 'Nouvelle &amp; marque'}
+        review = {'site': self.api.url, 'options': {'brands': {}}, 'rows': [{'kind': 'brands', 'source': 'Nouvelle marque', 'id': None, 'state': 'À choisir'}]}
+        callback = Mock()
+        dialog = MappingsDialog(owner, review, callback); dialog.withdraw()
+        try:
+            self.assertEqual(dialog.create_button['text'], 'Nouvelle marque…')
+            with patch('core.shop_mappings_ui.simpledialog.askstring', return_value='Nouvelle & marque'):
+                dialog.create_category()
+            deadline = time.monotonic() + 3
+            while dialog.creating and time.monotonic() < deadline:
+                owner.update(); time.sleep(.01)
+            self.assertFalse(dialog.creating)
+            owner.api.create_brand.assert_called_once_with('Nouvelle & marque')
+            self.assertEqual(review['rows'][0]['id'], 12)
+            self.assertEqual(review['options']['brands'][12], 'Nouvelle & marque')
+            dialog.apply()
+            callback.assert_called_once_with({'brands': {'nouvelle marque': 12}})
+        finally:
+            if dialog.winfo_exists(): dialog.close()
+            owner.destroy()

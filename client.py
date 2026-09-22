@@ -211,14 +211,14 @@ class Client(tk.Tk):
   if self.resume_path and not Path(self.drive.get()).expanduser().is_file():
    messagebox.showerror('Images','Récupère les images sur la plateforme fournisseur, puis sélectionne leur ZIP pour finaliser.');return
   if workflow_kind(self.configs[self.brand.get()])=='invoice' and not self.drive.get().strip():messagebox.showerror('Drive','Renseigne le lien du dossier Drive.');return
-  if self.configs[self.brand.get()].get('images',{}).get('mode')=='zip_by_sku' and not Path(self.drive.get()).is_file():messagebox.showerror('Images','Sélectionne le ZIP des images.');return
+  if (not self.is_two_pass() and self.configs[self.brand.get()].get('images',{}).get('mode') in {'zip_by_sku','zip_pattern'}) and not Path(self.drive.get()).is_file():messagebox.showerror('Images','Sélectionne le ZIP des images.');return
   self.folder=source.resolve().parent;self.stopped=False;self.eta.set('Temps restant : calcul en cours…')
   python_exe=str(Path(sys.executable).with_name('python.exe')) if os.name=='nt' and Path(sys.executable).name.lower()=='pythonw.exe' else sys.executable
   args=[python_exe,'-u',str(ROOT/'lancer.py'),'--supplier',self.brand.get(),'--source',str(source.resolve())]
   if self.resume_path:
    args=[python_exe,'-u',str(ROOT/'lancer.py'),'--resume-session',str(self.resume_path),'--images-zip',str(Path(self.drive.get()).expanduser().resolve())]
   elif workflow_kind(self.configs[self.brand.get()])=='invoice':args+=['--drive-url',self.drive.get().strip()]
-  elif self.configs[self.brand.get()].get('images',{}).get('mode')=='zip_by_sku':args+=['--images-zip',self.drive.get()]
+  elif (not self.is_two_pass() and self.configs[self.brand.get()].get('images',{}).get('mode') in {'zip_by_sku','zip_pattern'}):args+=['--images-zip',self.drive.get()]
   if not self.resume_path:args+=['--test-products' if self.test.get() else '--all-products']
   from core.product_rules import rules_path
   args+=['--lot']

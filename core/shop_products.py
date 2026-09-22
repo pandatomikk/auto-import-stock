@@ -66,8 +66,8 @@ class ProductAPI:
         if not user or not password:
             raise ConnectionFailure('Les accès WordPress sont nécessaires pour retrouver les images de la médiathèque.')
         # Restrict every write to product creation, never updates or deletions.
-        if payload is not None and route not in ('wc/v3/products', 'wc/v3/products/categories'):
-            raise ConnectionFailure('Seule la création de produits ou de catégories est autorisée.')
+        if payload is not None and route not in ('wc/v3/products', 'wc/v3/products/categories', 'wc/v3/products/brands'):
+            raise ConnectionFailure('Seule la création de produits, de catégories ou de marques est autorisée.')
         address = self.url + '/wp-json/' + route + ('?' + urlencode(query) if query else '')
         token = base64.b64encode(f'{user}:{password}'.encode()).decode('ascii')
         request = Request(address, data=None if payload is None else json.dumps(payload).encode(), method='GET' if payload is None else 'POST', headers={'Authorization': 'Basic ' + token, 'Accept': 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'AutoImportStock/0.20'})
@@ -99,6 +99,23 @@ class ProductAPI:
         if not isinstance(result, list) or any(not isinstance(x, dict) or not isinstance(x.get('id'), int) for x in result):
             raise ConnectionFailure('Recherche de référence invalide : contrôle interrompu.')
         # A comma in a SKU acts as a list in WooCommerce; CSV validation rejects it.
+        return result
+
+    def create_brand(self, name):
+        name = name.strip()
+        if not name:
+            raise ConnectionFailure('Renseignez un nom de marque.')
+        from core.shop_mappings import source_key
+        existing = [term for term in self.listing('wc/v3/products/brands')
+                    if source_key(term.get('name', '')) == source_key(name)]
+        if len(existing) == 1:
+            return existing[0]
+        if existing:
+            raise ConnectionFailure('Plusieurs marques correspondent : choisissez dans la liste.')
+        result = self.request('wc/v3/products/brands', payload={'name': name})
+        if (not isinstance(result, dict) or type(result.get('id')) is not int
+                or result['id'] <= 0 or not isinstance(result.get('name'), str) or not result['name'].strip()):
+            raise ConnectionFailure('Création de marque non confirmée. Rechargez les correspondances avant de réessayer.')
         return result
 
     def create_category(self, name, parent=0):
