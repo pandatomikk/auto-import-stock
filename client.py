@@ -54,7 +54,7 @@ class Client(tk.Tk):
   box=ttk.Frame(self,padding=26);box.pack(fill='both',expand=True,padx=24,pady=22);box.columnconfigure(1,weight=1)
   self.rules_button=ttk.Button(box,text='Règles produits…',command=self.open_product_rules);self.rules_button.grid(row=0,column=2,sticky='e')
   ttk.Label(box,text='Votre sélection',font=('Arial',15,'bold')).grid(row=0,column=0,columnspan=3,sticky='w',pady=(0,16))
-  self.brand=tk.StringVar(value=default);self.source=tk.StringVar();self.drive=tk.StringVar();self.zip=tk.StringVar();self.base=tk.StringVar();self.test=tk.BooleanVar(value=True);self.web=tk.BooleanVar(value=True)
+  self.brand=tk.StringVar(value=default);self.source=tk.StringVar();self.drive=tk.StringVar();self.zip=tk.StringVar();self.base=tk.StringVar();self.test=tk.BooleanVar(value=False);self.web=tk.BooleanVar(value=True)
   ttk.Label(box,text='Marque').grid(row=1,column=0,sticky='w');self.select=ttk.Combobox(box,textvariable=self.brand,values=list(self.configs),state='readonly');self.select.grid(row=1,column=1,sticky='ew');self.select.bind('<<ComboboxSelected>>',self.brand_changed)
   self.inputs=[self.select,self.rules_button]
   self.field(box,2,'Facture / catalogue',self.source,lambda:self.pick(self.source))
