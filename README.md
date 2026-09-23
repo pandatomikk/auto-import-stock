@@ -1,4 +1,4 @@
-# Auto Import Stock · V0.22
+# Auto Import Stock · V0.23
 
 **Moins de saisie, plus de temps pour votre commerce : préparez et ajoutez vos produits sur WooCommerce à partir des fichiers de vos fournisseurs.**
 
@@ -361,8 +361,12 @@ En ligne de commande, utiliser `--test-products` pour le test et `--all-products
 
 Configuration du pack privé dans Ma boutique, création de marques WooCommerce, classement des produits piloté par les profils privés, et images par référence/couleur en une étape. Mettre à jour le moteur avant le pack client.
 
-À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.22 sera 0.23, sauf demande explicite différente.
+À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.23 sera 0.24, sauf demande explicite différente.
 
 ## Version 0.22
 
 Le pack privé est téléchargé par l’API des fichiers GitHub (Contents), sans appeler la lecture des commits. Cela évite le refus 403 constaté avec un jeton disposant des droits de lecture. Les empreintes des fichiers et la stabilité du pack pendant le téléchargement sont vérifiées avant installation. Les erreurs GitHub affichent leur détail sans exposer le jeton. Le pack privé 0.21 reste compatible.
+
+## Version 0.23
+
+La préparation traite le catalogue complet par défaut ; le test limité à cinq produits reste disponible sur demande. L’adresse de la boutique configurée apparaît près de Ma boutique et ouvre le site dans le navigateur au clic. Elle se met à jour avec les paramètres de connexion.
