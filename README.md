@@ -1,4 +1,4 @@
-# Auto Import Stock · V0.20
+# Auto Import Stock · V0.21
 
 **Moins de saisie, plus de temps pour votre commerce : préparez et ajoutez vos produits sur WooCommerce à partir des fichiers de vos fournisseurs.**
 
@@ -356,3 +356,9 @@ La case **Tester avec 5 produits (toutes leurs photos)** sélectionne au maximum
 Les sorties de test portent le suffixe `_test_5_produits_woocommerce` et sont distinctes du catalogue complet. Pour une préparation en deux étapes, le choix est conservé dans la session et reste fixé jusqu’à sa finalisation. Une fois celle-ci terminée, décocher la case prépare le catalogue complet. Le CSV de test contient au maximum cinq produits : le contrôle de publication présente uniquement ceux de ce fichier.
 
 En ligne de commande, utiliser `--test-products` pour le test et `--all-products` pour le catalogue complet. Les anciens noms `--test-images` et `--all-images` restent acceptés, avec la nouvelle sémantique par produits. Un ancien pack facture qui ne prend pas en charge ce mode demande sa mise à jour, sans lancer un traitement complet par erreur. Le pack privé actualisé doit être installé séparément des mises à jour GitHub.
+
+## Version 0.21
+
+Configuration du pack privé dans Ma boutique, création de marques WooCommerce, classement des produits piloté par les profils privés, et images par référence/couleur en une étape. Mettre à jour le moteur avant le pack client.
+
+À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.21 sera 0.22, sauf demande explicite différente.

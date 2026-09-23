@@ -1,4 +1,5 @@
 """Read-only WordPress/WooCommerce connection checks. Optional local credential persistence, outside the application checkout."""
+from core.version import USER_AGENT
 from dataclasses import dataclass, field
 import base64
 import json
@@ -60,7 +61,7 @@ class NoRedirect(HTTPRedirectHandler):
 
 def get_json(url, username, password):
     token = base64.b64encode(f'{username}:{password}'.encode()).decode('ascii')
-    request = Request(url, headers={'Authorization': 'Basic ' + token, 'Accept': 'application/json', 'User-Agent': 'AutoImportStock/0.20'}, method='GET')
+    request = Request(url, headers={'Authorization': 'Basic ' + token, 'Accept': 'application/json', 'User-Agent': USER_AGENT}, method='GET')
     try:
         with build_opener(NoRedirect()).open(request, timeout=15) as response:
             raw = response.read(1024 * 1024 + 1)

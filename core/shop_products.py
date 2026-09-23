@@ -1,4 +1,5 @@
 """CSV preview and create-only WooCommerce imports. No update endpoint exists here."""
+from core.version import USER_AGENT
 import base64
 import csv
 from decimal import Decimal, InvalidOperation
@@ -70,7 +71,7 @@ class ProductAPI:
             raise ConnectionFailure('Seule la création de produits, de catégories ou de marques est autorisée.')
         address = self.url + '/wp-json/' + route + ('?' + urlencode(query) if query else '')
         token = base64.b64encode(f'{user}:{password}'.encode()).decode('ascii')
-        request = Request(address, data=None if payload is None else json.dumps(payload).encode(), method='GET' if payload is None else 'POST', headers={'Authorization': 'Basic ' + token, 'Accept': 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'AutoImportStock/0.20'})
+        request = Request(address, data=None if payload is None else json.dumps(payload).encode(), method='GET' if payload is None else 'POST', headers={'Authorization': 'Basic ' + token, 'Accept': 'application/json', 'Content-Type': 'application/json', 'User-Agent': USER_AGENT})
         try:
             with build_opener(NoRedirect()).open(request, timeout=60) as response:
                 raw = response.read(8 * 1024 * 1024 + 1)

@@ -1,4 +1,5 @@
 """Connection dialog; workers communicate with Tk only through a queue."""
+from core.version import VERSION
 import queue
 import threading
 import tkinter as tk
@@ -10,7 +11,7 @@ from core.shop_connection import Credentials, ConnectionFailure, check_connectio
 class ShopDialog(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
-        self.title('Ma boutique · V0.20')
+        self.title(f'Ma boutique · V{VERSION}')
         self.geometry(f'780x{min(820, max(500, self.winfo_screenheight()-100))}')
         self.transient(parent)
         self.parent = parent

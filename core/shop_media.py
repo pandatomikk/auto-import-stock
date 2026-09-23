@@ -1,4 +1,5 @@
 """Explicit single-image upload for the first WordPress media trial."""
+from core.version import USER_AGENT
 import base64
 import io
 import json
@@ -42,7 +43,7 @@ def upload_image(credentials, filename):
         'Content-Type': mime,
         'Content-Disposition': f'attachment; filename="{name}{extension}"',
         'Accept': 'application/json',
-        'User-Agent': 'AutoImportStock/0.20',
+        'User-Agent': USER_AGENT,
     })
     try:
         with build_opener(NoRedirect()).open(request, timeout=60) as response:
@@ -68,7 +69,7 @@ def rename_existing_image(credentials, existing, filename):
         raise ConnectionFailure('Identifiant de média invalide.')
     request = Request(normalize_url(credentials.url) + f'/wp-json/zpsi/v1/media/{media_id}/rename',
         data=json.dumps({'filename': upload_name(filename), 'expected_url': existing['url']}).encode(), method='POST',
-        headers={'Authorization':'Basic ' + token, 'Content-Type':'application/json', 'Accept':'application/json', 'User-Agent':'AutoImportStock/0.20'})
+        headers={'Authorization':'Basic ' + token, 'Content-Type':'application/json', 'Accept':'application/json', 'User-Agent':USER_AGENT})
     try:
         with build_opener(NoRedirect()).open(request, timeout=60) as response:
             raw = response.read(1024 * 1024 + 1)

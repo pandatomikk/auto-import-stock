@@ -1,4 +1,5 @@
 """Client de bureau : le moteur tourne dans un processus séparé."""
+from core.version import VERSION
 import json,os,queue,re,signal,subprocess,sys,threading,time,tempfile
 from pathlib import Path
 from core.profiles import discover_profiles, read_profile, workflow_kind
@@ -17,7 +18,7 @@ class Client(tk.Tk):
   if os.name=='nt':
    import ctypes
    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('ZPSI.AutoImportStock')
-  super().__init__();self.title('Import fournisseurs — ZPSI · V0.20');self.geometry('960x720');self.minsize(820,680);self.configure(bg='#f4f1f7')
+  super().__init__();self.title(f'Import fournisseurs — ZPSI · V{VERSION}');self.geometry('960x720');self.minsize(820,680);self.configure(bg='#f4f1f7')
   self.app_icon=tk.PhotoImage(file=str(ROOT/'assets'/'app.png'))
   self.iconphoto(True,self.app_icon)
   if os.name=='nt':self.iconbitmap(str(ROOT/'assets'/'app.ico'))
