@@ -60,16 +60,19 @@ def open_pack_dialog(app, owner=None, site=None, auto_update=False):
                     vault.set_password('zpsi-private-pack', repository, entered)
                 count = apply_pack(private_directory(), repository, revision, files, replace_conflicts=replace)
                 atomic_write(path, json.dumps({'repository': repository, 'branch': ref, 'site': linked_site}).encode())
-                events.put((True, f'{count} fichier(s) mis à jour. ' + ('Anciens fichiers sauvegardés dans private/pack-backup-… . ' if replace else '') + 'Fermez puis rouvrez l’application pour charger le pack.', None))
+                text = 'Le pack privé est déjà à jour. Vous pouvez continuer à utiliser l’application.'
+                if count:
+                    text = f'{count} fichier(s) mis à jour. ' + ('Anciens fichiers sauvegardés dans private/pack-backup-… . ' if replace else '') + 'Fermez puis rouvrez l’application pour charger le pack.'
+                events.put((True, text, None, bool(count)))
             except PackConflict as exc:
-                events.put((False, str(exc), {'repository': repository, 'branch': ref, 'revision': revision, 'files': files}))
+                events.put((False, str(exc), {'repository': repository, 'branch': ref, 'revision': revision, 'files': files}, False))
             except Exception as exc:
-                events.put((False, str(exc), None))
+                events.put((False, str(exc), None, False))
         threading.Thread(target=work, daemon=True).start()
         poll()
     def poll():
         try:
-            success, text, conflict = events.get_nowait()
+            success, text, conflict, restart_required = events.get_nowait()
         except queue.Empty:
             dialog.after(150, poll); return
         pending.clear()
@@ -82,9 +85,10 @@ def open_pack_dialog(app, owner=None, site=None, auto_update=False):
         dialog.protocol('WM_DELETE_WINDOW', dialog.destroy)
         if success:
             button.configure(state='disabled')
-            # Keep the modal open until the app is closed: no stale profiles used.
-            dialog.protocol('WM_DELETE_WINDOW', app.close)
-            ttk.Button(box, text='Fermer l’application', command=app.close).grid(row=10, column=0, pady=8)
+            # Only changed files require a restart to avoid stale profiles.
+            close = app.close if restart_required else dialog.destroy
+            dialog.protocol('WM_DELETE_WINDOW', close)
+            ttk.Button(box, text='Fermer l’application' if restart_required else 'Fermer', command=close).grid(row=10, column=0, pady=8)
     button = ttk.Button(box, text='Recevoir les mises à jour', command=update)
     button.grid(row=8, column=0, sticky='ew')
 
