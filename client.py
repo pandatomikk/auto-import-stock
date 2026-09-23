@@ -18,12 +18,6 @@ class Client(tk.Tk):
    import ctypes
    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('ZPSI.AutoImportStock')
   super().__init__();self.title('Import fournisseurs — ZPSI · V0.20');self.geometry('960x720');self.minsize(820,680);self.configure(bg='#f4f1f7')
-  menu=tk.Menu(self);settings_menu=tk.Menu(menu,tearoff=False)
-  def pack_settings():
-   from core.private_sync_ui import open_pack_dialog
-   open_pack_dialog(self)
-  settings_menu.add_command(label='Pack client…',command=pack_settings)
-  menu.add_cascade(label='Paramètres',menu=settings_menu);self.config(menu=menu)
   self.app_icon=tk.PhotoImage(file=str(ROOT/'assets'/'app.png'))
   self.iconphoto(True,self.app_icon)
   if os.name=='nt':self.iconbitmap(str(ROOT/'assets'/'app.ico'))
