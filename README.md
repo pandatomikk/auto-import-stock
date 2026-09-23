@@ -1,4 +1,4 @@
-# Auto Import Stock · V0.25
+# Auto Import Stock · V0.26
 
 **Moins de saisie, plus de temps pour votre commerce : préparez et ajoutez vos produits sur WooCommerce à partir des fichiers de vos fournisseurs.**
 
@@ -361,7 +361,7 @@ En ligne de commande, utiliser `--test-products` pour le test et `--all-products
 
 Configuration du pack privé dans Ma boutique, création de marques WooCommerce, classement des produits piloté par les profils privés, et images par référence/couleur en une étape. Mettre à jour le moteur avant le pack client.
 
-À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.25 sera 0.26, sauf demande explicite différente.
+À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.26 sera 0.27, sauf demande explicite différente.
 
 ## Version 0.22
 
@@ -378,3 +378,7 @@ Lorsqu’un pack privé rencontre des fichiers locaux différents, un bouton per
 ## Version 0.25
 
 Le pack privé Cabaïa reconnaît les pages contenant uniquement un en-tête ou un pied de page connu, sans bloquer une facture complète. Les pages comportant du texte inconnu ou des lignes produits illisibles restent à vérifier. Recevoir la mise à jour du pack privé dans Ma boutique, puis redémarrer le logiciel pour appliquer cette correction.
+
+## Version 0.26
+
+Le bouton « Actualiser le pack privé », à côté de « Ma boutique », lance la réception des mises à jour avec le dépôt et le jeton enregistrés. Sans dépôt configuré, il ouvre la configuration initiale. Le remplacement avec sauvegarde reste disponible en cas de conflit. Redémarrer le logiciel après réception du pack.
