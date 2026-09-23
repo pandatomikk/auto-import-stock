@@ -59,26 +59,45 @@ def download_pack(repository, branch, token):
         if len(raw) > 4_000_000:
             raise ValueError('Réponse GitHub trop volumineuse.')
         return json.loads(raw)
-    commit = get('/commits/' + branch)
-    revision = commit['sha']
-    if not re.fullmatch(r'[a-f0-9]{40}', revision):
-        raise ValueError('Révision GitHub invalide.')
-    tree = get('/git/trees/' + revision + '?recursive=1')
-    if tree.get('truncated'):
-        raise ValueError('Pack incomplet : arborescence trop volumineuse.')
+    def listing(path):
+        entries = get('/contents' + path + '?ref=' + branch)
+        if not isinstance(entries, list) or len(entries) >= 1000:
+            raise ValueError('Arborescence GitHub invalide ou trop volumineuse.')
+        return entries
+
+    roots = listing('')
+    def manifest(entries):
+        selected = {}
+        for entry in entries:
+            name = entry.get('path', '')
+            if name not in {'client.json', 'profiles', 'rules', 'adapters'}:
+                continue
+            expected_type = 'file' if name == 'client.json' else 'dir'
+            if entry.get('type') != expected_type or not re.fullmatch(r'[a-f0-9]{40}', entry.get('sha', '')) or name in selected:
+                raise ValueError('Arborescence du pack invalide.')
+            selected[name] = entry['sha']
+        return selected
+    before = manifest(roots)
+    entries = [e for e in roots if e.get('path') == 'client.json']
+    for directory in ('profiles', 'rules', 'adapters'):
+        if directory in before:
+            children = listing('/' + directory)
+            if any(not str(e.get('path', '')).startswith(directory + '/') for e in children):
+                raise ValueError('Chemin GitHub incohérent.')
+            entries.extend(children)
     files = {}
-    for entry in tree['tree']:
-        name = entry['path']
+    for entry in entries:
+        name = entry.get('path', '')
         if not allowed(name):
             continue
-        sha = entry['sha']
-        if entry.get('mode') not in ('100644', '100755') or entry.get('type') != 'blob' or not re.fullmatch(r'[a-f0-9]{40}', sha):
+        sha = entry.get('sha', '')
+        if entry.get('type') != 'file' or not re.fullmatch(r'[a-f0-9]{40}', sha) or name in files:
             raise ValueError('Type de fichier interdit dans le pack.')
         if entry.get('size', 0) > 1_000_000 or len(files) >= 200:
             raise ValueError('Pack trop volumineux.')
-        blob = get('/git/blobs/' + sha)
-        if blob.get('encoding') != 'base64':
-            raise ValueError('Encodage GitHub inattendu.')
+        blob = get('/contents/' + name + '?ref=' + branch)
+        if blob.get('encoding') != 'base64' or blob.get('type') != 'file' or blob.get('sha') != sha:
+            raise ValueError('Le pack a changé ou son contenu est invalide ; réessayez.')
         content = base64.b64decode(''.join(blob['content'].split()), validate=True)
         actual = hashlib.sha1(b'blob ' + str(len(content)).encode() + b'\0' + content).hexdigest()
         if actual != sha or len(content) > 1_000_000:
@@ -86,6 +105,10 @@ def download_pack(repository, branch, token):
         files[name] = content
     if not files or sum(map(len, files.values())) > 10_000_000:
         raise ValueError('Pack vide ou trop volumineux.')
+    if manifest(listing('')) != before:
+        raise ValueError('Le pack a changé pendant le téléchargement ; réessayez.')
+    # Content fingerprint, not a commit SHA: Contents access alone is sufficient.
+    revision = hashlib.sha1(json.dumps(before, sort_keys=True).encode()).hexdigest()
     return revision, files
 
 

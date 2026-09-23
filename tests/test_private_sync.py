@@ -54,7 +54,8 @@ class PrivateSyncTests(unittest.TestCase):
         data=b'{"image_filename_suffix":"example.fr"}'
         sha=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
         commit='a'*40
-        responses=[{'sha':commit},{'tree':[{'path':'client.json','sha':sha,'size':len(data),'mode':'100644','type':'blob'}]}, {'encoding':'base64','content':base64.b64encode(data).decode()}]
+        entry={'path':'client.json','sha':sha,'size':len(data),'type':'file'}
+        responses=[[entry], {**entry,'encoding':'base64','content':base64.b64encode(data).decode()}, [entry]]
         requests=[]
         class Response:
             def __init__(self,data): self.data=json.dumps(data).encode()
@@ -68,7 +69,8 @@ class PrivateSyncTests(unittest.TestCase):
         with patch.object(sync,'build_opener',return_value=Opener()):
             revision,files=sync.download_pack('owner/repo','main','test-token')
         self.assertEqual(files,{'client.json':data})
-        self.assertEqual(revision,commit)
+        self.assertEqual(len(revision),40)
+        self.assertTrue(all('/contents' in r.full_url for r in requests))
         self.assertTrue(all(r.get_method()=='GET' for r in requests))
         self.assertTrue(all(r.full_url.startswith('https://api.github.com/repos/owner/repo/') for r in requests))
 
@@ -83,4 +85,22 @@ class PrivateSyncTests(unittest.TestCase):
                 sync.download_pack('owner/repo', 'main', 'secret-token')
         self.assertIn('Resource not accessible', str(caught.exception))
         self.assertNotIn('secret-token', str(caught.exception))
-        self.assertIn('/commits/main', str(caught.exception))
+        self.assertIn('/contents?ref=main', str(caught.exception))
+
+    def test_contents_download_rejects_change_before_installation(self):
+        import base64, hashlib
+        from unittest.mock import Mock
+        data=b'{}'
+        sha=hashlib.sha1(b'blob 2\0'+data).hexdigest()
+        entry={'path':'client.json','type':'file','sha':sha,'size':2}
+        responses=[[entry],{**entry,'encoding':'base64','content':base64.b64encode(data).decode()},[{**entry,'sha':'f'*40}]]
+        def response(*args, **kwargs):
+            value=Mock()
+            value.__enter__=Mock(return_value=value)
+            value.__exit__=Mock(return_value=False)
+            value.read.return_value=json.dumps(responses.pop(0)).encode()
+            return value
+        opener=Mock();opener.open.side_effect=response
+        with patch.object(sync,'build_opener',return_value=opener):
+            with self.assertRaisesRegex(ValueError,'changé pendant'):
+                sync.download_pack('owner/repo','main','token')
