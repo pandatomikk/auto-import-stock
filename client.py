@@ -44,7 +44,7 @@ class Client(tk.Tk):
   style.configure('TCombobox',padding=9,fieldbackground='#f8f6fa')
   style.configure('TCheckbutton',padding=6,background='white')
   style.configure('Horizontal.TProgressbar',background='#80509a',troughcolor='#eee8f3',borderwidth=0)
-  header=tk.Frame(self,bg='#3c1648',height=120);header.pack(fill='x');header.pack_propagate(False)
+  header=tk.Frame(self,bg='#3c1648',height=140);header.pack(fill='x');header.pack_propagate(False)
   shop_actions=tk.Frame(header,bg='#3c1648');shop_actions.pack(side='right',padx=24,pady=8)
   ttk.Button(shop_actions,text='Ma boutique',command=self.open_shop).pack(fill='x',pady=(0,6))
   ttk.Button(shop_actions,text='Publier sur le site',command=self.publish_lot).pack(fill='x')
