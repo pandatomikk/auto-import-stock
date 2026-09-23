@@ -8,14 +8,20 @@ from .secret_store import system_vault, atomic_write
 from .private_sync import download_pack, apply_pack, PackConflict
 
 
-def open_pack_dialog(app, owner=None, site=None):
+def open_pack_dialog(app, owner=None, site=None, auto_update=False):
     if app.proc or getattr(app.update_controller, 'busy', False):
         messagebox.showinfo('Pack client', 'Attendez la fin du traitement en cours.', parent=app)
         return
     if app.grab_current():
         return
     path = private_directory() / '.sync-config.json'
-    config = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
+    try:
+        config = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
+        if not isinstance(config, dict):
+            raise ValueError('Configuration du pack invalide.')
+    except (OSError, ValueError) as exc:
+        messagebox.showerror('Pack client', str(exc), parent=app)
+        return
     owner = owner or app
     dialog = Toplevel(owner)
     dialog.title('Mise à jour du pack client')
@@ -85,3 +91,9 @@ def open_pack_dialog(app, owner=None, site=None):
     replace_button = ttk.Button(box, text='Remplacer les fichiers locaux (avec sauvegarde)', command=lambda: update(replace=True))
     replace_button.grid(row=9, column=0, sticky='ew', pady=8)
     replace_button.grid_remove()
+
+    if auto_update:
+        if config.get('repository'):
+            dialog.after_idle(update)
+        else:
+            status.set('Configurez le dépôt privé et son jeton une première fois. Les prochaines actualisations démarreront en un clic.')

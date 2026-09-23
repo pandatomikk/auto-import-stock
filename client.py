@@ -44,9 +44,11 @@ class Client(tk.Tk):
   style.configure('TCombobox',padding=9,fieldbackground='#f8f6fa')
   style.configure('TCheckbutton',padding=6,background='white')
   style.configure('Horizontal.TProgressbar',background='#80509a',troughcolor='#eee8f3',borderwidth=0)
-  header=tk.Frame(self,bg='#3c1648',height=140);header.pack(fill='x');header.pack_propagate(False)
+  header=tk.Frame(self,bg='#3c1648',height=180);header.pack(fill='x');header.pack_propagate(False)
   shop_actions=tk.Frame(header,bg='#3c1648');shop_actions.pack(side='right',padx=24,pady=8)
-  ttk.Button(shop_actions,text='Ma boutique',command=self.open_shop).pack(fill='x',pady=(0,6))
+  shop_buttons=tk.Frame(shop_actions,bg='#3c1648');shop_buttons.pack(fill='x',pady=(0,6))
+  ttk.Button(shop_buttons,text='Ma boutique',command=self.open_shop).pack(side='left',padx=(0,6))
+  ttk.Button(shop_buttons,text='Actualiser le pack privé',command=self.refresh_private_pack).pack(side='left')
   ttk.Button(shop_actions,text='Publier sur le site',command=self.publish_lot).pack(fill='x')
   self.shop_link=tk.Label(shop_actions,bg='#3c1648',fg='#f4c95d',font=('Arial',10,'underline'),takefocus=True)
   self.shop_link.pack(pady=(4,0))
@@ -54,7 +56,9 @@ class Client(tk.Tk):
   self.shop_link.bind('<Return>',self.open_shop_site)
   self.refresh_shop_link()
   tk.Label(header,text='ZPSI  /  CATALOGUE',bg='#3c1648',fg='#f4c95d',font=('Arial',10,'bold')).pack(anchor='w',padx=32,pady=(18,5))
-  tk.Label(header,text='Vos produits, prêts pour la boutique.',bg='#3c1648',fg='white',font=('Arial',23,'bold')).pack(anchor='w',padx=32)
+  headline=tk.Label(header,text='Vos produits, prêts pour la boutique.',bg='#3c1648',fg='white',font=('Arial',23,'bold'),justify='left',anchor='w')
+  headline.pack(fill='x',padx=32)
+  headline.bind('<Configure>',lambda event: headline.configure(wraplength=max(100,event.width)))
   tk.Label(header,text='Une facture, des images. On prépare le reste.',bg='#3c1648',fg='#ddcde5',font=('Arial',11)).pack(anchor='w',padx=32,pady=5)
   box=ttk.Frame(self,padding=26);box.pack(fill='both',expand=True,padx=24,pady=22);box.columnconfigure(1,weight=1)
   self.rules_button=ttk.Button(box,text='Règles produits…',command=self.open_product_rules);self.rules_button.grid(row=0,column=2,sticky='e')
@@ -120,6 +124,9 @@ class Client(tk.Tk):
   if self.shop_site_url:
    import webbrowser
    webbrowser.open(self.shop_site_url)
+ def refresh_private_pack(self):
+  from core.private_sync_ui import open_pack_dialog
+  open_pack_dialog(self,auto_update=True)
  def open_shop(self):
   from core.shop_ui import ShopDialog
   if getattr(self,'shop_dialog',None) is not None and self.shop_dialog.winfo_exists():
