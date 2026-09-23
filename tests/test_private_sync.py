@@ -104,3 +104,25 @@ class PrivateSyncTests(unittest.TestCase):
         with patch.object(sync,'build_opener',return_value=opener):
             with self.assertRaisesRegex(ValueError,'changé pendant'):
                 sync.download_pack('owner/repo','main','token')
+
+    def test_explicit_replacement_backs_up_manual_install_and_preserves_unrelated_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);(root/'profiles').mkdir()
+            (root/'profiles/test.json').write_bytes(b'{"local":true}')
+            (root/'other.txt').write_text('keep')
+            files={'profiles/test.json':b'{"remote":true}','client.json':b'{}'}
+            with self.assertRaises(sync.PackConflict):sync.apply_pack(root,'owner/repo','a',files)
+            self.assertEqual(sync.apply_pack(root,'owner/repo','a',files,replace_conflicts=True),2)
+            self.assertEqual((root/'profiles/test.json').read_bytes(),files['profiles/test.json'])
+            backup=next(root.glob('pack-backup-*'))
+            self.assertEqual((backup/'profiles/test.json').read_bytes(),b'{"local":true}')
+            self.assertEqual((root/'other.txt').read_text(),'keep')
+            self.assertEqual(sync.apply_pack(root,'owner/repo','a',files),0)
+
+    def test_failed_backup_never_replaces_local_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);(root/'client.json').write_bytes(b'{"local":true}')
+            with patch.object(sync,'atomic_write',side_effect=OSError('disk full')):
+                with self.assertRaises(OSError):sync.apply_pack(root,'owner/repo','a',{'client.json':b'{}'},replace_conflicts=True)
+            self.assertEqual((root/'client.json').read_bytes(),b'{"local":true}')
+            self.assertFalse((root/sync.STATE).exists())

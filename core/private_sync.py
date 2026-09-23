@@ -11,6 +11,10 @@ from .secret_store import atomic_write
 STATE = '.sync-state.json'
 
 
+class PackConflict(ValueError):
+    pass
+
+
 def allowed(name):
     if not isinstance(name, str) or '\\' in name:
         return False
@@ -112,7 +116,7 @@ def download_pack(repository, branch, token):
     return revision, files
 
 
-def apply_pack(root, repository, revision, files):
+def apply_pack(root, repository, revision, files, replace_conflicts=False):
     root = Path(root).resolve()
     root.mkdir(parents=True, exist_ok=True)
     if not files or any(not allowed(name) for name in files):
@@ -147,7 +151,7 @@ def apply_pack(root, repository, revision, files):
             incoming = files.get(name)
             if current == incoming:
                 continue
-            if name in old and incoming is not None and digest(incoming) == old[name]:
+            if not replace_conflicts and name in old and incoming is not None and digest(incoming) == old[name]:
                 continue  # Upstream unchanged: keep local customization.
             if current is not None and (name not in old or digest(current) != old[name]):
                 conflicts.append(name)
@@ -155,10 +159,23 @@ def apply_pack(root, repository, revision, files):
                 conflicts.append(name)  # Local deletion is also a local change.
             else:
                 changes[name] = incoming
-        if conflicts:
-            raise ValueError('Réglages locaux différents, aucun fichier remplacé : ' + ', '.join(sorted(conflicts)))
+        if conflicts and not replace_conflicts:
+            raise PackConflict('Réglages locaux différents, aucun fichier remplacé : ' + ', '.join(sorted(conflicts)))
+        if replace_conflicts:
+            changes.update({name: files.get(name) for name in conflicts})
         before = {name: (root/name).read_bytes() if (root/name).exists() else None for name in changes}
         state_before = state_path.read_bytes() if state_path.exists() else None
+        if replace_conflicts and changes:
+            import tempfile
+            # A durable backup must complete before the first replacement.
+            backup = Path(tempfile.mkdtemp(prefix='pack-backup-', dir=root))
+            for name, content in before.items():
+                if content is not None:
+                    atomic_write(backup / name, content)
+            if state_before is not None:
+                atomic_write(backup / STATE, state_before)
+            atomic_write(backup / 'restoration.json', json.dumps({'repository': repository, 'revision': revision,
+                         'previously_absent': [name for name, content in before.items() if content is None]}, indent=2).encode())
         try:
             for name, content in changes.items():
                 path = root / name
