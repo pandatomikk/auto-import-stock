@@ -21,18 +21,19 @@ class PackShortcutTest(unittest.TestCase):
                 vault=Mock();vault.get_password.return_value='saved-token'
                 with patch('core.private_sync_ui.private_directory',return_value=root), patch('core.private_sync_ui.system_vault',return_value=vault), patch('core.private_sync_ui.download_pack',return_value=('revision',{})) as download, patch('core.private_sync_ui.apply_pack',return_value=count) as apply:
                     open_pack_dialog(app,auto_update=True)
-                    deadline=time.monotonic()+3
-                    while not apply.called and time.monotonic()<deadline:
-                        app.update();time.sleep(.01)
-                    download.assert_called_once_with('owner/pack','main','saved-token')
-                    apply.assert_called_once()
-                    until=time.monotonic()+.25
-                    while time.monotonic()<until:
-                        app.update();time.sleep(.01)
                     dialog=next(w for w in app.winfo_children() if isinstance(w,tk.Toplevel))
                     box=dialog.winfo_children()[0]
                     label='Fermer l’application' if count else 'Fermer'
-                    close=next(w for w in box.winfo_children() if w.winfo_class()=='TButton' and w.cget('text')==label)
+                    close=None
+                    deadline=time.monotonic()+5
+                    while close is None and time.monotonic()<deadline:
+                        app.update()
+                        close=next((w for w in box.winfo_children() if w.winfo_class()=='TButton' and w.cget('text')==label),None)
+                        if close is None:
+                            time.sleep(.01)
+                    self.assertIsNotNone(close, 'La mise à jour doit afficher son bouton de fermeture.')
+                    download.assert_called_once_with('owner/pack','main','saved-token')
+                    apply.assert_called_once()
                     if window_close:
                         dialog.tk.call(dialog.protocol('WM_DELETE_WINDOW'))
                     else:
