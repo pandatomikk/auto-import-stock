@@ -108,6 +108,7 @@ class ShopDialog(tk.Toplevel):
             self.status.set('Enregistrement impossible : vérifiez l’adresse HTTPS et les droits du dossier de configuration.')
             return False
         self.parent.shop_credentials = credentials
+        if hasattr(self.parent, "refresh_shop_link"): self.parent.refresh_shop_link()
         self.status.set('Accès enregistrés sur ce poste.' if self.remember.get() else 'Secrets retirés du fichier local ; ils restent disponibles pour cette session.')
         return True
 
@@ -153,6 +154,7 @@ class ShopDialog(tk.Toplevel):
             self.status.set(str(exc))
             return
         self.parent.shop_credentials = credentials
+        if hasattr(self.parent, "refresh_shop_link"): self.parent.refresh_shop_link()
         if not self.persist():
             return
         self.busy = True

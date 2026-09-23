@@ -48,6 +48,11 @@ class Client(tk.Tk):
   shop_actions=tk.Frame(header,bg='#3c1648');shop_actions.pack(side='right',padx=24,pady=8)
   ttk.Button(shop_actions,text='Ma boutique',command=self.open_shop).pack(fill='x',pady=(0,6))
   ttk.Button(shop_actions,text='Publier sur le site',command=self.publish_lot).pack(fill='x')
+  self.shop_link=tk.Label(shop_actions,bg='#3c1648',fg='#f4c95d',font=('Arial',10,'underline'),takefocus=True)
+  self.shop_link.pack(pady=(4,0))
+  self.shop_link.bind('<Button-1>',self.open_shop_site)
+  self.shop_link.bind('<Return>',self.open_shop_site)
+  self.refresh_shop_link()
   tk.Label(header,text='ZPSI  /  CATALOGUE',bg='#3c1648',fg='#f4c95d',font=('Arial',10,'bold')).pack(anchor='w',padx=32,pady=(18,5))
   tk.Label(header,text='Vos produits, prêts pour la boutique.',bg='#3c1648',fg='white',font=('Arial',23,'bold')).pack(anchor='w',padx=32)
   tk.Label(header,text='Une facture, des images. On prépare le reste.',bg='#3c1648',fg='#ddcde5',font=('Arial',11)).pack(anchor='w',padx=32,pady=5)
@@ -102,6 +107,19 @@ class Client(tk.Tk):
    self.status.set('Attendez la fin de la préparation avant de sélectionner le CSV à publier.');return
   self.open_shop()
   self.shop_dialog.open_products(publication=True)
+ def refresh_shop_link(self):
+  from core.shop_connection import settings_path,normalize_url,ConnectionFailure
+  try:
+   credentials=getattr(self,'shop_credentials',None)
+   value=credentials.url if credentials else json.loads(settings_path().read_text(encoding='utf-8')).get('url','')
+   self.shop_site_url=normalize_url(value)
+  except (OSError,ValueError,ConnectionFailure):self.shop_site_url=''
+  text=self.shop_site_url.removeprefix('https://')
+  self.shop_link.configure(text=(text if len(text)<=32 else text[:29]+'…') or 'Boutique non configurée',cursor='hand2' if text else '')
+ def open_shop_site(self,event=None):
+  if self.shop_site_url:
+   import webbrowser
+   webbrowser.open(self.shop_site_url)
  def open_shop(self):
   from core.shop_ui import ShopDialog
   if getattr(self,'shop_dialog',None) is not None and self.shop_dialog.winfo_exists():
