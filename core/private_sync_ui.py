@@ -8,7 +8,7 @@ from .secret_store import system_vault, atomic_write
 from .private_sync import download_pack, apply_pack
 
 
-def open_pack_dialog(app):
+def open_pack_dialog(app, owner=None, site=None):
     if app.proc or getattr(app.update_controller, 'busy', False):
         messagebox.showinfo('Pack client', 'Attendez la fin du traitement en cours.', parent=app)
         return
@@ -16,18 +16,22 @@ def open_pack_dialog(app):
         return
     path = private_directory() / '.sync-config.json'
     config = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
-    dialog = Toplevel(app)
+    owner = owner or app
+    dialog = Toplevel(owner)
     dialog.title('Mise à jour du pack client')
-    dialog.transient(app); dialog.grab_set()
+    dialog.transient(owner); dialog.grab_set()
     box = ttk.Frame(dialog, padding=20); box.pack(fill='both', expand=True)
+    linked_site = site or config.get('site', '')
+    if linked_site:
+        ttk.Label(box, text='Boutique associée : ' + linked_site, wraplength=480).grid(row=0, column=0, sticky='w', pady=(0, 10))
     repo = StringVar(value=config.get('repository', ''))
     branch = StringVar(value=config.get('branch', 'main'))
     token = StringVar()
     status = StringVar(value='Réception des mises à jour uniquement. Aucun paramètre envoyé.')
     for row, (label, variable) in enumerate([('Dépôt GitHub privé (compte/dépôt)', repo), ('Branche', branch), ('Jeton en lecture seule (vide si déjà enregistré)', token)]):
-        ttk.Label(box, text=label).grid(row=row*2, column=0, sticky='w', pady=(8, 2))
-        ttk.Entry(box, textvariable=variable, width=58, show='*' if variable is token else '').grid(row=row*2+1, column=0, sticky='ew')
-    ttk.Label(box, textvariable=status, wraplength=480).grid(row=6, column=0, pady=12)
+        ttk.Label(box, text=label).grid(row=row*2+1, column=0, sticky='w', pady=(8, 2))
+        ttk.Entry(box, textvariable=variable, width=58, show='*' if variable is token else '').grid(row=row*2+2, column=0, sticky='ew')
+    ttk.Label(box, textvariable=status, wraplength=480).grid(row=7, column=0, pady=12)
     events = queue.Queue()
     def update():
         repository, ref, entered = repo.get().strip(), branch.get().strip(), token.get().strip()
@@ -44,8 +48,8 @@ def open_pack_dialog(app):
                 revision, files = download_pack(repository, ref, secret)
                 if entered:
                     vault.set_password('zpsi-private-pack', repository, entered)
-                atomic_write(path, json.dumps({'repository': repository, 'branch': ref}).encode())
                 count = apply_pack(private_directory(), repository, revision, files)
+                atomic_write(path, json.dumps({'repository': repository, 'branch': ref, 'site': linked_site}).encode())
                 events.put((True, f'{count} fichier(s) mis à jour. Fermez puis rouvrez l’application pour charger le pack.'))
             except Exception as exc:
                 events.put((False, str(exc)))
@@ -63,6 +67,6 @@ def open_pack_dialog(app):
             button.configure(state='disabled')
             # Keep the modal open until the app is closed: no stale profiles used.
             dialog.protocol('WM_DELETE_WINDOW', app.close)
-            ttk.Button(box, text='Fermer l’application', command=app.close).grid(row=8, column=0, pady=8)
+            ttk.Button(box, text='Fermer l’application', command=app.close).grid(row=9, column=0, pady=8)
     button = ttk.Button(box, text='Recevoir les mises à jour', command=update)
-    button.grid(row=7, column=0, sticky='ew')
+    button.grid(row=8, column=0, sticky='ew')

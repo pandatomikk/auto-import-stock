@@ -58,17 +58,34 @@ class ShopDialog(tk.Toplevel):
         ttk.Label(box, textvariable=self.status, wraplength=680).grid(row=10, column=0, columnspan=2, sticky='w', pady=10)
 
         ttk.Separator(box).grid(row=11, column=0, columnspan=2, sticky='ew', pady=10)
-        ttk.Label(box, text='Test d’import d’une image', font=('Arial', 13, 'bold')).grid(row=12, column=0, columnspan=2, sticky='w')
-        ttk.Label(box, text='Crée réellement un média sur le site indiqué ci-dessus. Aucun produit ne sera créé. JPEG, PNG ou WebP, 20 Mo maximum. Chaque nouvel envoi crée un média.', wraplength=700).grid(row=13, column=0, columnspan=2, sticky='w', pady=8)
+        ttk.Label(box, text='Pack privé de cette boutique', font=('Arial', 13, 'bold')).grid(row=12, column=0, columnspan=2, sticky='w')
+        ttk.Label(box, text='Reliez cette boutique à son dépôt privé et renseignez le jeton GitHub pour recevoir ses profils et règles produits.', wraplength=680).grid(row=13, column=0, columnspan=2, sticky='w', pady=8)
+        self.pack_button = ttk.Button(box, text='Configurer le pack privé…', command=self.open_pack)
+        self.pack_button.grid(row=14, column=0, columnspan=2, sticky='w', pady=8)
+
+        ttk.Separator(box).grid(row=15, column=0, columnspan=2, sticky='ew', pady=10)
+        ttk.Label(box, text='Test d’import d’une image', font=('Arial', 13, 'bold')).grid(row=16, column=0, columnspan=2, sticky='w')
+        ttk.Label(box, text='Crée réellement un média sur le site indiqué ci-dessus. Aucun produit ne sera créé. JPEG, PNG ou WebP, 20 Mo maximum. Chaque nouvel envoi crée un média.', wraplength=700).grid(row=17, column=0, columnspan=2, sticky='w', pady=8)
         self.image_label = tk.StringVar(value='Aucune image sélectionnée')
-        ttk.Label(box, textvariable=self.image_label, wraplength=700).grid(row=14, column=0, columnspan=2, sticky='w')
+        ttk.Label(box, textvariable=self.image_label, wraplength=700).grid(row=18, column=0, columnspan=2, sticky='w')
         self.choose_button = ttk.Button(box, text='Choisir une image…', command=self.choose_image)
-        self.choose_button.grid(row=15, column=0, sticky='w', pady=8)
+        self.choose_button.grid(row=19, column=0, sticky='w', pady=8)
         self.upload_button = ttk.Button(box, text='Envoyer l’image sur ce site', command=self.send_image, state='disabled')
-        self.upload_button.grid(row=15, column=1, sticky='w', pady=8)
+        self.upload_button.grid(row=19, column=1, sticky='w', pady=8)
 
         self.csv_button = ttk.Button(box, text='Importer un CSV d’articles…', command=self.open_products)
-        self.csv_button.grid(row=16, column=0, columnspan=2, sticky='w', pady=10)
+        self.csv_button.grid(row=20, column=0, columnspan=2, sticky='w', pady=10)
+
+    def open_pack(self):
+        if self.busy:
+            return
+        from core.private_sync_ui import open_pack_dialog
+        from core.shop_connection import normalize_url
+        try:
+            site = normalize_url(self.values['url'].get())
+        except ConnectionFailure as exc:
+            self.status.set(str(exc)); return
+        open_pack_dialog(self.parent, owner=self, site=site)
 
     def open_products(self, publication=False):
         if self.busy:
