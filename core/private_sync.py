@@ -41,7 +41,21 @@ def download_pack(repository, branch, token):
             with opener.open(req, timeout=30) as response:
                 raw = response.read(4_000_001)
         except HTTPError as exc:
-            raise ValueError(f'Accès GitHub refusé ou indisponible (HTTP {exc.code}). Vérifiez le dépôt et son accès en lecture.') from None
+            try:
+                detail = json.loads(exc.read(65536)).get('message', '')
+                detail = ' '.join(str(detail).split())
+                from urllib.parse import quote
+                for secret in (token, quote(token, safe='')):
+                    if secret: detail = detail.replace(secret, '[masqué]')
+                detail = detail[:500]
+                limited = exc.headers.get('X-RateLimit-Remaining') == '0' or 'rate limit' in detail.lower()
+                hint = ('Limite de requêtes GitHub atteinte ; réessayez plus tard.' if limited else
+                        'Vérifiez le jeton enregistré et les droits du dépôt.')
+            except (ValueError, AttributeError, OSError):
+                detail, hint = '', 'Vérifiez le jeton enregistré et les droits du dépôt.'
+            finally:
+                exc.close()
+            raise ValueError(f'GitHub HTTP {exc.code} ({path}) : {detail or "refus sans détail"}. {hint}') from None
         if len(raw) > 4_000_000:
             raise ValueError('Réponse GitHub trop volumineuse.')
         return json.loads(raw)

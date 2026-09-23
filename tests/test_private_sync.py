@@ -71,3 +71,16 @@ class PrivateSyncTests(unittest.TestCase):
         self.assertEqual(revision,commit)
         self.assertTrue(all(r.get_method()=='GET' for r in requests))
         self.assertTrue(all(r.full_url.startswith('https://api.github.com/repos/owner/repo/') for r in requests))
+
+    def test_github_denial_reports_reason_without_token(self):
+        import io
+        from urllib.error import HTTPError
+        from unittest.mock import Mock
+        opener = Mock()
+        opener.open.side_effect = HTTPError('https://api.github.com', 403, 'Forbidden', {}, io.BytesIO(b'{"message":"Resource not accessible: secret-token"}'))
+        with patch.object(sync, 'build_opener', return_value=opener):
+            with self.assertRaises(ValueError) as caught:
+                sync.download_pack('owner/repo', 'main', 'secret-token')
+        self.assertIn('Resource not accessible', str(caught.exception))
+        self.assertNotIn('secret-token', str(caught.exception))
+        self.assertIn('/commits/main', str(caught.exception))
