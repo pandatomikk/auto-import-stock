@@ -68,6 +68,37 @@ class ProductTests(unittest.TestCase):
         import_plan(plan, self.api, self.folder / 'report2.json')
         self.assertEqual(len(self.api.created), 1)
 
+    def test_existing_draft_is_updated_and_published_with_same_id(self):
+        self.api.products['DRAFT'] = {'id': 42, 'sku': 'DRAFT', 'status': 'draft'}
+        self.api.publish_draft = Mock(return_value={'id':42, 'sku':'DRAFT', 'status':'publish'})
+        plan = prepare_csv(self.csv([{'UGS':'DRAFT', 'Nom':'Nouveau titre', 'Publié':'1', 'Stock':'3'}]), self.api)
+        self.assertFalse(plan['errors'])
+        self.assertEqual(plan['items'][0]['state'], 'draft_update')
+        report = import_plan(plan, self.api, self.folder/'draft.json')
+        self.assertEqual(report['results'][0]['state'], 'updated')
+        self.assertEqual(report['results'][0]['id'], 42)
+        self.api.publish_draft.assert_called_once_with(42, plan['items'][0]['payload'])
+        self.assertEqual(self.api.created, [])
+
+    def test_draft_published_since_preview_is_not_overwritten(self):
+        self.api.products['DRAFT'] = {'id':42, 'sku':'DRAFT', 'status':'draft'}
+        self.api.publish_draft = Mock()
+        plan = prepare_csv(self.csv([{'UGS':'DRAFT', 'Nom':'Titre', 'Publié':'1'}]), self.api)
+        self.api.products['DRAFT']['status'] = 'publish'
+        report = import_plan(plan, self.api, self.folder/'draft.json')
+        self.assertEqual(report['results'][0]['state'], 'skipped')
+        self.api.publish_draft.assert_not_called()
+
+    def test_draft_api_rechecks_status_before_put(self):
+        api = ProductAPI(Credentials('https://shop.example',consumer_key='key',consumer_secret='secret'))
+        api.request = Mock(side_effect=[{'id':42,'sku':'DRAFT','status':'draft'}, {'id':42,'sku':'DRAFT','status':'publish'}])
+        payload = {'sku':'DRAFT','status':'publish','name':'Nouveau titre'}
+        api.publish_draft(42,payload)
+        self.assertEqual(api.request.call_args.kwargs, {'payload':payload,'method':'PUT'})
+        api.request = Mock(return_value={'id':42,'sku':'DRAFT','status':'publish'})
+        with self.assertRaises(ConnectionFailure): api.publish_draft(42,payload)
+        self.assertEqual(api.request.call_count,1)
+
     def test_draft_catalogue_remains_unpublished(self):
         plan = prepare_csv(self.csv([{'UGS': 'NEW', 'Nom': 'Article', 'Publié': '-1', 'En stock ?': '0'}]), self.api)
         self.assertEqual(plan['errors'], [])

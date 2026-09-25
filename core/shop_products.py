@@ -1,4 +1,4 @@
-"""CSV preview and create-only WooCommerce imports. No update endpoint exists here."""
+"""CSV preview, creation and publication of existing drafts."""
 from core.version import USER_AGENT
 import base64
 import csv
@@ -60,18 +60,18 @@ class ProductAPI:
         if not credentials.consumer_key.strip() or not credentials.consumer_secret.strip():
             raise ConnectionFailure('Renseignez les clés WooCommerce.')
 
-    def request(self, route, query=None, payload=None):
+    def request(self, route, query=None, payload=None, method=None):
         c = self.credentials
         wordpress = route.startswith('wp/v2/')
         user, password = (c.username.strip(), ''.join(c.application_password.split())) if wordpress else (c.consumer_key.strip(), c.consumer_secret.strip())
         if not user or not password:
             raise ConnectionFailure('Les accès WordPress sont nécessaires pour retrouver les images de la médiathèque.')
-        # Restrict every write to product creation, never updates or deletions.
-        if payload is not None and route not in ('wc/v3/products', 'wc/v3/products/categories', 'wc/v3/products/brands'):
+        # Updates are restricted to individual products; no deletion endpoint.
+        if payload is not None and not (route in ('wc/v3/products', 'wc/v3/products/categories', 'wc/v3/products/brands') or (method == 'PUT' and re.fullmatch(r'wc/v3/products/[1-9][0-9]*', route))):
             raise ConnectionFailure('Seule la création de produits, de catégories ou de marques est autorisée.')
         address = self.url + '/wp-json/' + route + ('?' + urlencode(query) if query else '')
         token = base64.b64encode(f'{user}:{password}'.encode()).decode('ascii')
-        request = Request(address, data=None if payload is None else json.dumps(payload).encode(), method='GET' if payload is None else 'POST', headers={'Authorization': 'Basic ' + token, 'Accept': 'application/json', 'Content-Type': 'application/json', 'User-Agent': USER_AGENT})
+        request = Request(address, data=None if payload is None else json.dumps(payload).encode(), method=method or ('GET' if payload is None else 'POST'), headers={'Authorization': 'Basic ' + token, 'Accept': 'application/json', 'Content-Type': 'application/json', 'User-Agent': USER_AGENT})
         try:
             with build_opener(NoRedirect()).open(request, timeout=60) as response:
                 raw = response.read(8 * 1024 * 1024 + 1)
@@ -101,6 +101,13 @@ class ProductAPI:
             raise ConnectionFailure('Recherche de référence invalide : contrôle interrompu.')
         # A comma in a SKU acts as a list in WooCommerce; CSV validation rejects it.
         return result
+
+    def publish_draft(self, product_id, payload):
+        route = 'wc/v3/products/' + str(int(product_id))
+        current = self.request(route)
+        if current.get('status') != 'draft' or current.get('sku') != payload['sku'] or payload.get('status') != 'publish':
+            raise ConnectionFailure('Le brouillon a changé : recommencez le contrôle.')
+        return self.request(route, payload=payload, method='PUT')
 
     def create_brand(self, name):
         name = name.strip()
@@ -330,15 +337,17 @@ def prepare_csv(path, api, progress=lambda text: None, mappings=None, image_over
             if sku.casefold() in seen:
                 raise ConnectionFailure('UGS présente plusieurs fois dans le CSV.')
             seen.add(sku.casefold())
-            if api.existing(sku):
+            existing = api.existing(sku)
+            draft = len(existing) == 1 and existing[0].get("status") == "draft" and existing[0].get("sku") == sku and row.get("Publié", "1") == "1"
+            if existing and not draft:
                 plan['items'].append({'line': index, 'sku': sku, 'name': row.get('Nom', ''), 'state': 'existing'})
                 continue
             payload = row_payload(row, resolver)
-            plan['items'].append({'line': index, 'sku': sku, 'name': row['Nom'], 'state': 'new', 'payload': payload})
+            plan['items'].append({'line': index, 'sku': sku, 'name': row['Nom'], 'state': 'draft_update' if draft else 'new', 'payload': payload, **({'product_id': existing[0]['id']} if draft else {})})
         except ConnectionFailure as exc:
             plan['errors'].append(f'Ligne {index} ({sku}) : {exc}')
     plan['correspondences'] = list({(entry['kind'], entry['source'], entry['id']): entry for entry in resolver.used_mappings}.values())
-    new = [item for item in plan['items'] if item['state'] == 'new']
+    new = [item for item in plan['items'] if item['state'] in ('new', 'draft_update')]
     plan['warnings'] = []
     external_count = sum(bool(row.get('URL externe')) for _, row in rows)
     if external_count:
@@ -366,7 +375,12 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
         started = time.monotonic()
         progress(publication_status('Création des articles', product_progress, item['sku']))
         # Recheck immediately before POST, including when resuming after an interruption.
-        if api.existing(item['sku']):
+        existing = api.existing(item['sku'])
+        updating = item['state'] == 'draft_update'
+        valid_draft = updating and len(existing) == 1 and existing[0].get('id') == item['product_id'] and existing[0].get('status') == 'draft' and existing[0].get('sku') == item['sku']
+        if updating and not existing:
+            raise ConnectionFailure('Brouillon introuvable : recommencez le contrôle.')
+        if existing and not valid_draft:
             record['state'] = 'skipped'
             report['results'].append(record); save()
             product_progress.update(time.monotonic() - started, cached=True)
@@ -375,10 +389,12 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
         record['state'] = 'unconfirmed'
         report['results'].append(record); save()
         try:
-            result = api.create(item['payload'])
+            result = api.publish_draft(item['product_id'], item['payload']) if updating else api.create(item['payload'])
+            if updating and (not isinstance(result, dict) or result.get('id') != item['product_id'] or result.get('status') != 'publish'):
+                raise ConnectionFailure('Publication du brouillon non confirmée : vérifiez la boutique.')
             if not isinstance(result, dict) or not isinstance(result.get('id'), int) or result['id'] <= 0 or result.get('sku') != item['sku']:
                 raise ConnectionFailure('Création non confirmée : vérifiez la boutique avant de relancer.')
-            record.update(state='created', id=result['id'], url=result.get('permalink', ''))
+            record.update(state='updated' if updating else 'created', id=result['id'], url=result.get('permalink', ''))
         except ConnectionFailure as exc:
             record['message'] = str(exc)
             if getattr(exc, 'rejected', False): record['state'] = 'rejected'
