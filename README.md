@@ -402,3 +402,17 @@ L’import met à jour et publie les produits existants en brouillon lorsque le 
 ## Version 0.31
 
 Le rapprochement des photos accepte une référence image configurée distincte de la référence produit. Le pack Arthur & Aston associe ainsi les photos de ceintures sans suffixe de taille, tout en conservant les références commerciales et les tailles dans les produits. Mettre à jour le logiciel et le pack privé, puis refaire la préparation pour intégrer les photos retrouvées.
+
+### Briques de préparation configurables
+
+Un profil peut ajouter des colonnes calculées avant le mapping, sans lecteur fournisseur dédié :
+
+```json
+{"source_options":{"composed_columns":[{"name":"Référence photo","columns":["Model","Part"],"separator":"_"}]}}
+```
+
+Les colonnes sources sont conservées ; les valeurs sont assemblées comme du texte (les zéros initiaux sont conservés lorsqu’ils existent dans la source). Un champ manquant ou une tentative d’écrasement de colonne bloque la préparation.
+
+`images.nested_archives: true` active la lecture des ZIP contenus dans le ZIP de photos, pour les parcours en une ou deux étapes. L’option est désactivée par défaut. La lecture conserve les chemins internes, n’extrait pas de chemin fourni par l’archive et limite profondeur, nombre d’entrées et taille décompressée cumulée. Les correspondances ambiguës restent bloquantes. Le fichier fournisseur, les règles de catégorie et les motifs de noms de photos restent définis dans le profil privé.
+
+En mode ZIP imbriqués, les noms de fichiers répétés sont comparés par contenu : des copies strictement identiques sont utilisées une seule fois ; un même nom avec des contenus différents bloque la préparation avant conversion.

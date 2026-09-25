@@ -465,13 +465,14 @@ def build_zip_image_context(config: dict, zip_path: Path | None, base_url: str |
                            article=clean_identifier(_logical_value(row, 'model', mapping)),
                            color_code=str(_logical_value(row, 'color_code', mapping) or ''),
                            color=str(_logical_value(row, 'color', mapping) or '')) for row in rows]
-        with zipfile.ZipFile(zip_path) as archive:
+        from .image_archive import ImageArchive
+        with ImageArchive(zip_path, nested=settings.get('nested_archives', False)) as archive:
             selected, _ = select_zip_images(archive, {i['ean'] for i in identities}, identities, settings)
         pattern_names = {key: [PurePosixPath(info.filename).name for info in entries]
                          for key, entries in selected.items()}
     return {
         "pattern_names": pattern_names,
-        "index": index_zip_images(zip_path, extensions),
+        "index": index_zip_images(zip_path, extensions, nested=settings.get('nested_archives', False)),
         "zip_path":zip_path,
         "local":settings.get("output_mode")=="local",
         "config":config,
@@ -734,7 +735,7 @@ def convert_catalogue(
                 from .images import prepare_local_zip_images
                 names=catalogue_image_names(image_context,sku)
                 preparation_event('Images de l’article', f'{reference} : {len(names)} photo(s) à vérifier / convertir en WebP.', product_index - 1, len(filtered_rows))
-                urls=prepare_local_zip_images(image_context['zip_path'],names,(output_path.parent if output_path else source_path.parent),config.get('supplier_name','fournisseur'),out.get('Nom',sku),progress=image_progress)
+                urls=prepare_local_zip_images(image_context['zip_path'],names,(output_path.parent if output_path else source_path.parent),config.get('supplier_name','fournisseur'),out.get('Nom',sku),progress=image_progress,nested=image_context['config']['images'].get('nested_archives', False))
             if urls:
                 out["Images"] = ", ".join(urls)
 

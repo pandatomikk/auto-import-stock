@@ -243,7 +243,8 @@ def finalize_catalogue(session_path, images_zip):
         raise ValueError('Nom du dossier images invalide dans la session.')
     images_root = root / image_directory / 'fichiers_webp'
     records = []
-    with zipfile.ZipFile(images_zip) as archive:
+    from .image_archive import ImageArchive
+    with ImageArchive(images_zip, nested=image_settings.get('nested_archives', False)) as archive:
         selected, ignored = select_zip_images(archive, references, data.get('image_identifiers', []), image_settings)
         if not any(selected.values()):
             raise ValueError('Aucune image ne correspond aux produits. Vérifier le format de nom configuré dans le profil, ou utiliser des noms contenant les EAN exacts. La préparation reste disponible ; sélectionner un autre ZIP.')

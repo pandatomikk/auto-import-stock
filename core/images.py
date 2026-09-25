@@ -4,6 +4,7 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import quote
 import re
 import zipfile
+from .image_archive import ImageArchive
 
 
 def _natural_image_sort(name: str):
@@ -20,11 +21,11 @@ def _natural_image_sort(name: str):
     return (2, 999999, "", stem.casefold())
 
 
-def index_zip_images(zip_path: Path, extensions: list[str]) -> dict[str, list[str]]:
+def index_zip_images(zip_path: Path, extensions: list[str], nested=False) -> dict[str, list[str]]:
     allowed = {"." + ext.lower().lstrip(".") for ext in extensions}
     files: list[str] = []
 
-    with zipfile.ZipFile(zip_path) as z:
+    with ImageArchive(zip_path, nested=nested) as z:
         for info in z.infolist():
             if info.is_dir():
                 continue
@@ -72,7 +73,7 @@ def images_for_sku(
     return [base + quote(filename) for filename in matches]
 
 
-def prepare_local_zip_images(zip_path,names,parent,brand,product,progress=None):
+def prepare_local_zip_images(zip_path,names,parent,brand,product,progress=None,nested=False):
     from .client_settings import image_filename
     import hashlib, tempfile, unicodedata, time
     from .image_webp import optimize_webp, PIPELINE_VERSION
@@ -85,7 +86,7 @@ def prepare_local_zip_images(zip_path,names,parent,brand,product,progress=None):
         return re.sub(r'[^a-z0-9]+','-',value).strip('-')[:100] or 'produit'
     root=Path(parent)/('images_'+slug(brand))/'fichiers_webp';root.mkdir(parents=True,exist_ok=True)
     results=[]
-    with zipfile.ZipFile(zip_path) as z:
+    with ImageArchive(zip_path, nested=nested) as z:
         for number,name in enumerate(names,1):
             entries=[i for i in z.infolist() if not i.is_dir() and PurePosixPath(i.filename).name==name]
             if len(entries)!=1:raise ValueError('Nom image ambigu dans le ZIP : '+name)

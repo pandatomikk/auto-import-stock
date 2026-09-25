@@ -81,12 +81,12 @@ def read_source(path: Path, options: dict | None = None) -> tuple[list[str], lis
         if (not isinstance(headers, list) or not all(isinstance(h, str) for h in headers)
                 or not all(isinstance(row, dict) for row in rows)):
             raise ValueError('Le lecteur doit retourner une liste de colonnes et des lignes sous forme de dictionnaires.')
-        return headers, rows
+        return compose_columns(headers, rows, options)
     suffix = path.suffix.lower()
     if suffix == ".csv":
-        return read_csv_rows(path)
+        return compose_columns(*read_csv_rows(path), options)
     if suffix in {".xlsx", ".xlsm"}:
-        return read_excel_rows(path, options)
+        return compose_columns(*read_excel_rows(path, options), options)
     raise ValueError(f"Format non supporté : {suffix}. Formats : .csv, .xlsx, .xlsm")
 
 def write_csv(path: Path, columns: list[str], rows: list[dict[str, Any]]) -> None:
@@ -101,3 +101,21 @@ def write_csv(path: Path, columns: list[str], rows: list[dict[str, Any]]) -> Non
         writer.writeheader()
         for row in rows:
             writer.writerow({col: row.get(col, "") for col in columns})
+
+
+def compose_columns(headers, rows, options):
+    """Add configured source columns without overwriting the original data."""
+    headers = list(headers)
+    rows = [dict(row) for row in rows]
+    for rule in (options or {}).get('composed_columns', []):
+        target, sources = rule['name'], rule['columns']
+        if target in headers or not sources or any(source not in headers for source in sources):
+            raise ValueError('Composition de colonne invalide : ' + target)
+        separator = rule.get('separator', '')
+        for number, row in enumerate(rows, 2):
+            values = [str(row.get(source) if row.get(source) is not None else '').strip() for source in sources]
+            if any(not value for value in values):
+                raise ValueError(f'Ligne {number} : valeur absente pour composer {target}.')
+            row[target] = separator.join(values)
+        headers.append(target)
+    return headers, rows
