@@ -1,4 +1,4 @@
-# Auto Import Stock · V0.30
+# Auto Import Stock · V0.31
 
 **Moins de saisie, plus de temps pour votre commerce : préparez et ajoutez vos produits sur WooCommerce à partir des fichiers de vos fournisseurs.**
 
@@ -361,7 +361,7 @@ En ligne de commande, utiliser `--test-products` pour le test et `--all-products
 
 Configuration du pack privé dans Ma boutique, création de marques WooCommerce, classement des produits piloté par les profils privés, et images par référence/couleur en une étape. Mettre à jour le moteur avant le pack client.
 
-À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.30 sera 0.31, sauf demande explicite différente.
+À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.31 sera 0.32, sauf demande explicite différente.
 
 ## Version 0.22
 
@@ -398,3 +398,7 @@ Le pack privé Cabaïa retire les suffixes fournisseur 1PK et TU des titres prod
 ## Version 0.30
 
 L’import met à jour et publie les produits existants en brouillon lorsque le CSV demande la publication, en conservant leur identifiant. Le statut est revérifié avant envoi ; les produits déjà publiés restent ignorés. Le pack privé Arthur & Aston nettoie les caractères parasites _x0000_ des fichiers Excel et prépare désormais les produits pour publication. Mettre à jour le logiciel, actualiser le pack privé puis refaire la préparation depuis les sources.
+
+## Version 0.31
+
+Le rapprochement des photos accepte une référence image configurée distincte de la référence produit. Le pack Arthur & Aston associe ainsi les photos de ceintures sans suffixe de taille, tout en conservant les références commerciales et les tailles dans les produits. Mettre à jour le logiciel et le pack privé, puis refaire la préparation pour intégrer les photos retrouvées.
