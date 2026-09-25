@@ -138,9 +138,16 @@ def select_zip_images(archive, references, identities=(), settings=None):
     """Match a configured article/color pattern, or an exact EAN."""
     selected = {ref: [] for ref in references}
     by_article_color = {}
+    article_pattern = (settings or {}).get('article_pattern')
+    article_pattern = re.compile(article_pattern, re.I) if article_pattern else None
+    if article_pattern and 'article' not in article_pattern.groupindex:
+        raise ValueError('Le motif de référence image doit définir le groupe article.')
     for product in identities:
         ref = product['ean']
         article = str(product['article']).strip().upper()
+        alias = article_pattern.fullmatch(article) if article_pattern else None
+        if alias:
+            article = alias['article'].upper()
         if ref not in references or not article:
             continue
         for value in (product['color_code'], product['color']):
