@@ -1,4 +1,4 @@
-# Auto Import Stock · V0.31
+# Auto Import Stock · V0.32
 
 **Moins de saisie, plus de temps pour votre commerce : préparez et ajoutez vos produits sur WooCommerce à partir des fichiers de vos fournisseurs.**
 
@@ -361,7 +361,7 @@ En ligne de commande, utiliser `--test-products` pour le test et `--all-products
 
 Configuration du pack privé dans Ma boutique, création de marques WooCommerce, classement des produits piloté par les profils privés, et images par référence/couleur en une étape. Mettre à jour le moteur avant le pack client.
 
-À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.31 sera 0.32, sauf demande explicite différente.
+À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.32 sera 0.33, sauf demande explicite différente.
 
 ## Version 0.22
 
@@ -416,3 +416,7 @@ Les colonnes sources sont conservées ; les valeurs sont assemblées comme du te
 `images.nested_archives: true` active la lecture des ZIP contenus dans le ZIP de photos, pour les parcours en une ou deux étapes. L’option est désactivée par défaut. La lecture conserve les chemins internes, n’extrait pas de chemin fourni par l’archive et limite profondeur, nombre d’entrées et taille décompressée cumulée. Les correspondances ambiguës restent bloquantes. Le fichier fournisseur, les règles de catégorie et les motifs de noms de photos restent définis dans le profil privé.
 
 En mode ZIP imbriqués, les noms de fichiers répétés sont comparés par contenu : des copies strictement identiques sont utilisées une seule fois ; un même nom avec des contenus différents bloque la préparation avant conversion.
+
+## Version 0.32
+
+Le moteur propose la composition de champs depuis plusieurs colonnes et la lecture bornée des ZIP imbriqués, activées par configuration. Les photos de même nom et de contenu identique sont dédupliquées ; des contenus différents restent bloquants. Le pack privé ajoute GUESS sans adaptateur dédié, avec quantités nettes, prix publics, catégories et association des photos. Mettre à jour le logiciel avant d’actualiser le pack privé, puis redémarrer.
