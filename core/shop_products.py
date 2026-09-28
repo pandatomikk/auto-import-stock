@@ -18,9 +18,10 @@ from core.secret_store import atomic_write
 
 
 class ProductRequestFailure(ConnectionFailure):
-    def __init__(self, message, rejected=False):
+    def __init__(self, message, rejected=False, duplicate_sku=False):
         super().__init__(message)
         self.rejected = rejected
+        self.duplicate_sku = duplicate_sku
 
 
 def api_error(exc, credentials, writing):
@@ -47,10 +48,17 @@ def api_error(exc, credentials, writing):
             text = text.replace(secret, '[masqué]').replace(quote(secret, safe=''), '[masqué]')
     text = ' '.join(text.split())[:2000]
     rejected = status == 400 and code in ('rest_invalid_param', 'rest_missing_callback_param')
+    # WooCommerce uses this code for an SKU collision discovered while creating
+    # a product.  It is a confirmed no-op, unlike a timeout or a generic 400.
+    duplicate_sku = (
+        status == 400
+        and code == 'woocommerce_rest_product_not_created'
+        and bool(re.search(r'\b(?:sku|ugs)\b.*(?:already|d[ée]j[àa]).*(?:exist|pr[ée]sent|use)|(?:exist|pr[ée]sent|use).*\b(?:sku|ugs)\b', message, re.IGNORECASE))
+    )
     explanation = f'API : HTTP {status}' + (f' — {text}' if text else '. Aucun détail exploitable retourné par le serveur.')
     if writing:
         explanation += ' Article refusé avant création : corrigez les champs indiqués.' if rejected else ' Création non confirmée : vérifiez la boutique avant de relancer.'
-    return ProductRequestFailure(explanation, rejected=rejected)
+    return ProductRequestFailure(explanation, rejected=rejected, duplicate_sku=duplicate_sku)
 
 
 class ProductAPI:
@@ -397,6 +405,15 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
             record.update(state='updated' if updating else 'created', id=result['id'], url=result.get('permalink', ''))
         except ConnectionFailure as exc:
             record['message'] = str(exc)
+            if getattr(exc, 'duplicate_sku', False):
+                # WooCommerce has definitively refused the POST because the SKU
+                # is already assigned.  Do not retry it, but let the rest of the
+                # batch continue as it would for an SKU found during preview.
+                record['state'] = 'skipped'
+                product_progress.update(time.monotonic() - started, cached=True)
+                save()
+                progress(publication_status('Création des articles', product_progress))
+                continue
             if getattr(exc, 'rejected', False): record['state'] = 'rejected'
             save()
             break  # No automatic retry of a possibly successful write.

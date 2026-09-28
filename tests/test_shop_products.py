@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 from core.shop_connection import Credentials, ConnectionFailure
-from core.shop_products import ProductAPI, prepare_csv, import_plan, row_payload, Resolver
+from core.shop_products import ProductAPI, ProductRequestFailure, api_error, prepare_csv, import_plan, row_payload, Resolver
 
 
 class FakeAPI:
@@ -142,6 +142,28 @@ class ProductTests(unittest.TestCase):
         report = import_plan(plan, self.api, self.folder / 'report.json')
         self.assertEqual(report['results'][0]['state'], 'skipped')
         self.assertFalse(self.api.created)
+
+    def test_duplicate_sku_rejected_by_woocommerce_is_skipped_and_batch_continues(self):
+        plan = prepare_csv(self.csv([{'UGS': 'ALREADY-THERE', 'Nom': 'Ancien'}, {'UGS': 'NEW', 'Nom': 'Nouveau'}]), self.api)
+        duplicate = ProductRequestFailure('API : HTTP 400 — UGS déjà présent.', duplicate_sku=True)
+        self.api.create = Mock(side_effect=[duplicate, {'id': 99, 'sku': 'NEW', 'permalink': 'https://shop.example/product/new'}])
+
+        report = import_plan(plan, self.api, self.folder / 'report.json')
+
+        self.assertEqual([item['state'] for item in report['results']], ['skipped', 'created'])
+        self.assertEqual(self.api.create.call_count, 2)
+        self.assertIn('UGS déjà présent', report['results'][0]['message'])
+
+    def test_woocommerce_duplicate_sku_response_is_identified(self):
+        response = Mock()
+        response.code = 400
+        response.read.return_value = json.dumps({
+            'code': 'woocommerce_rest_product_not_created',
+            'message': 'Le produit avec l’UGS (3667022030780) que vous essayez d’insérer est déjà présent dans le tableau de consultation',
+        }).encode()
+        failure = api_error(response, Credentials('https://shop.example', consumer_key='key', consumer_secret='secret'), writing=True)
+        self.assertTrue(failure.duplicate_sku)
+        self.assertFalse(failure.rejected)
 
     @patch('core.shop_products.build_opener')
     def test_transport_never_updates_and_uses_json(self, opener):
