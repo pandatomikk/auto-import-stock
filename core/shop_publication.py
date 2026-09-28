@@ -143,10 +143,22 @@ def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=up
                 try:
                     result = uploader(api.credentials, filename)
                 except ConnectionFailure as exc:
-                    raise ConnectionFailure(str(exc) + ' Journal : ' + str(journal_path)) from None
-                previous = {'state': 'uploaded', **result}
-                journal['images'][key] = previous
-                save()
+                    # A 503/timeout can happen after WordPress has stored the
+                    # media but before it returns its JSON response. Refresh the
+                    # library once: an exact match is safe to reuse and lets the
+                    # batch continue without a duplicate upload.
+                    recovered = MediaLibrary(api).find(filename)
+                    if recovered:
+                        previous = {'state': 'uploaded', **recovered}
+                        journal['images'][key] = previous
+                        save()
+                        progress('Image retrouvée dans la médiathèque après un envoi non confirmé : ' + Path(filename).name)
+                    else:
+                        raise ConnectionFailure(str(exc) + ' Journal : ' + str(journal_path)) from None
+                else:
+                    previous = {'state': 'uploaded', **result}
+                    journal['images'][key] = previous
+                    save()
             uploaded[filename] = previous
             image_progress.update(time.monotonic() - started, cached=cached)
             progress(publication_status('Envoi des images', image_progress))

@@ -122,17 +122,16 @@ class LotsPublicationTests(unittest.TestCase):
         self.upload.assert_not_called()
         self.assertEqual(self.api.created[0]['images'], [{'id':77}])
 
-    def test_lost_response_is_reconciled_on_next_attempt(self):
+    def test_lost_response_is_reconciled_without_reuploading_or_stopping_batch(self):
         plan = prepare_publication(self.csv, self.api)
         def lost(*args):
             self.media.append({'id':78,'source_url':'https://shop.example/uploads/photo.webp'})
-            raise ConnectionFailure('Réponse perdue')
+            raise ConnectionFailure('Envoi non confirmé (HTTP 503).')
         self.upload.side_effect = lost
-        with self.assertRaises(ConnectionFailure):
-            publish_plan(plan,self.api,self.root/'first.json',uploader=self.upload)
-        publish_plan(plan,self.api,self.root/'second.json',uploader=self.upload)
+        report = publish_plan(plan,self.api,self.root/'report.json',uploader=self.upload)
         self.assertEqual(self.upload.call_count,1)
         self.assertEqual(self.api.created[0]['images'],[{'id':78}])
+        self.assertEqual(report['results'][0]['state'], 'created')
 
     def test_library_failure_blocks_new_uploads(self):
         plan=prepare_publication(self.csv,self.api)
