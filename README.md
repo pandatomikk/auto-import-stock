@@ -424,3 +424,5 @@ Le moteur propose la composition de champs depuis plusieurs colonnes et la lectu
 ## Version 0.33
 
 Un refus WooCommerce pour UGS déjà présente ignore cet article et laisse continuer le lot ; le rapport indique désormais ce résultat sans annoncer une création non confirmée. Après un envoi d’image non confirmé, la médiathèque est interrogée une fois : une correspondance non ambiguë est réutilisée sans nouvel envoi. Cette version documente également ces deux correctifs précédemment publiés sous le numéro 0.32.
+
+Les produits absents du catalogue sont également recherchés dans la corbeille. Pour un CSV demandant la publication, l’aperçu affiche « Restaurer et publier » : la fiche existante est mise à jour avec le même identifiant, après vérification de son statut. Le rapport distingue les produits restaurés. Un CSV en brouillon ne restaure pas automatiquement un produit supprimé.

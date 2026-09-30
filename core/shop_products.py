@@ -106,17 +106,21 @@ class ProductAPI:
         raise ConnectionFailure('Catalogue trop volumineux pour ce test ; contrôle interrompu.')
 
     def existing(self, sku):
-        result = self.request('wc/v3/products', {'sku': sku, 'status': 'any', 'per_page': 100})
-        if not isinstance(result, list) or any(not isinstance(x, dict) or not isinstance(x.get('id'), int) for x in result):
-            raise ConnectionFailure('Recherche de référence invalide : contrôle interrompu.')
-        # A comma in a SKU acts as a list in WooCommerce; CSV validation rejects it.
-        return result
+        for status in ('any', 'trash'):
+            result = self.request('wc/v3/products', {'sku': sku, 'status': status, 'per_page': 100})
+            if not isinstance(result, list) or any(not isinstance(x, dict) or not isinstance(x.get('id'), int) for x in result):
+                raise ConnectionFailure('Recherche de référence invalide : contrôle interrompu.')
+            if result:
+                return result
+        return []
 
-    def publish_draft(self, product_id, payload):
+    def publish_draft(self, product_id, payload, expected_status='draft'):
+        if expected_status not in ('draft', 'trash'):
+            raise ConnectionFailure('Statut de restauration invalide.')
         route = 'wc/v3/products/' + str(int(product_id))
         current = self.request(route)
-        if current.get('status') != 'draft' or current.get('sku') != payload['sku'] or payload.get('status') != 'publish':
-            raise ConnectionFailure('Le brouillon a changé : recommencez le contrôle.')
+        if current.get('status') != expected_status or current.get('sku') != payload['sku'] or payload.get('status') != 'publish':
+            raise ConnectionFailure('Le produit a changé : recommencez le contrôle.')
         return self.request(route, payload=payload, method='PUT')
 
     def create_brand(self, name):
@@ -348,12 +352,16 @@ def prepare_csv(path, api, progress=lambda text: None, mappings=None, image_over
                 raise ConnectionFailure('UGS présente plusieurs fois dans le CSV.')
             seen.add(sku.casefold())
             existing = api.existing(sku)
-            draft = len(existing) == 1 and existing[0].get("status") == "draft" and existing[0].get("sku") == sku and row.get("Publié", "1") == "1"
+            if len(existing) > 1:
+                raise ConnectionFailure('Plusieurs produits portent cette UGS : vérifiez la boutique.')
+            if existing and existing[0].get('status') == 'trash' and row.get('Publié', '1') != '1':
+                raise ConnectionFailure('Produit dans la corbeille : le CSV doit demander la publication pour le restaurer.')
+            draft = len(existing) == 1 and existing[0].get("status") in ("draft", "trash") and existing[0].get("sku") == sku and row.get("Publié", "1") == "1"
             if existing and not draft:
                 plan['items'].append({'line': index, 'sku': sku, 'name': row.get('Nom', ''), 'state': 'existing'})
                 continue
             payload = row_payload(row, resolver)
-            plan['items'].append({'line': index, 'sku': sku, 'name': row['Nom'], 'state': 'draft_update' if draft else 'new', 'payload': payload, **({'product_id': existing[0]['id']} if draft else {})})
+            plan['items'].append({'line': index, 'sku': sku, 'name': row['Nom'], 'state': 'draft_update' if draft else 'new', 'payload': payload, **({'product_id': existing[0]['id'], 'original_status': existing[0]['status']} if draft else {})})
         except ConnectionFailure as exc:
             plan['errors'].append(f'Ligne {index} ({sku}) : {exc}')
     plan['correspondences'] = list({(entry['kind'], entry['source'], entry['id']): entry for entry in resolver.used_mappings}.values())
@@ -387,7 +395,7 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
         # Recheck immediately before POST, including when resuming after an interruption.
         existing = api.existing(item['sku'])
         updating = item['state'] == 'draft_update'
-        valid_draft = updating and len(existing) == 1 and existing[0].get('id') == item['product_id'] and existing[0].get('status') == 'draft' and existing[0].get('sku') == item['sku']
+        valid_draft = updating and len(existing) == 1 and existing[0].get('id') == item['product_id'] and existing[0].get('status') == item.get('original_status', 'draft') and existing[0].get('sku') == item['sku']
         if updating and not existing:
             raise ConnectionFailure('Brouillon introuvable : recommencez le contrôle.')
         if existing and not valid_draft:
@@ -399,12 +407,15 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
         record['state'] = 'unconfirmed'
         report['results'].append(record); save()
         try:
-            result = api.publish_draft(item['product_id'], item['payload']) if updating else api.create(item['payload'])
+            if updating and item.get('original_status') == 'trash':
+                result = api.publish_draft(item['product_id'], item['payload'], expected_status='trash')
+            else:
+                result = api.publish_draft(item['product_id'], item['payload']) if updating else api.create(item['payload'])
             if updating and (not isinstance(result, dict) or result.get('id') != item['product_id'] or result.get('status') != 'publish'):
                 raise ConnectionFailure('Publication du brouillon non confirmée : vérifiez la boutique.')
             if not isinstance(result, dict) or not isinstance(result.get('id'), int) or result['id'] <= 0 or result.get('sku') != item['sku']:
                 raise ConnectionFailure('Création non confirmée : vérifiez la boutique avant de relancer.')
-            record.update(state='updated' if updating else 'created', id=result['id'], url=result.get('permalink', ''))
+            record.update(state=('restored' if item.get('original_status') == 'trash' else 'updated') if updating else 'created', id=result['id'], url=result.get('permalink', ''))
         except ConnectionFailure as exc:
             record['message'] = str(exc)
             if getattr(exc, 'duplicate_sku', False):

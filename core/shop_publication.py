@@ -101,7 +101,7 @@ def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=up
                 current = api.existing(item['sku'])
                 if not current:
                     raise ConnectionFailure('Brouillon introuvable : recommencez le contrôle.')
-                if len(current) != 1 or current[0].get('id') != item['product_id'] or current[0].get('status') != 'draft' or current[0].get('sku') != item['sku']:
+                if len(current) != 1 or current[0].get('id') != item['product_id'] or current[0].get('status') != item.get('original_status', 'draft') or current[0].get('sku') != item['sku']:
                     item['state'] = 'existing'; item.pop('payload', None)
             needed.update(image['_local_path'] for image in item.get('payload', {}).get('images', []) if '_local_path' in image)
         from core.media_library import MediaLibrary, generated_identity, upload_name, normalized_name

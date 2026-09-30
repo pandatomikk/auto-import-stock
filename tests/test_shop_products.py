@@ -99,6 +99,33 @@ class ProductTests(unittest.TestCase):
         with self.assertRaises(ConnectionFailure): api.publish_draft(42,payload)
         self.assertEqual(api.request.call_count,1)
 
+    def test_trash_lookup_is_explicit(self):
+        api = ProductAPI(Credentials('https://shop.example',consumer_key='key',consumer_secret='secret'))
+        api.request = Mock(side_effect=[[], [{'id':42,'sku':'A','status':'trash'}]])
+        self.assertEqual(api.existing('A')[0]['status'],'trash')
+        self.assertEqual(api.request.call_args.args[1]['status'],'trash')
+
+    def test_trash_is_restored_with_same_id(self):
+        self.api.products['TRASH'] = {'id':42,'sku':'TRASH','status':'trash'}
+        self.api.publish_draft = Mock(return_value={'id':42,'sku':'TRASH','status':'publish'})
+        plan = prepare_csv(self.csv([{'UGS':'TRASH','Nom':'Titre corrigé','Publié':'1'}]),self.api)
+        self.assertFalse(plan['errors'])
+        self.assertEqual(plan['items'][0]['original_status'],'trash')
+        report = import_plan(plan,self.api,self.folder/'trash.json')
+        self.assertEqual(report['results'][0]['state'],'restored')
+        self.api.publish_draft.assert_called_once_with(42,plan['items'][0]['payload'],expected_status='trash')
+        self.assertFalse(self.api.created)
+
+    def test_trash_publication_rechecks_original_status(self):
+        api = ProductAPI(Credentials('https://shop.example',consumer_key='key',consumer_secret='secret'))
+        payload={'sku':'A','status':'publish'}
+        api.request=Mock(side_effect=[{'id':42,'sku':'A','status':'trash'},{'id':42,'sku':'A','status':'publish'}])
+        api.publish_draft(42,payload,expected_status='trash')
+        self.assertEqual(api.request.call_args.kwargs['method'],'PUT')
+        api.request=Mock(return_value={'id':42,'sku':'A','status':'publish'})
+        with self.assertRaises(ConnectionFailure):api.publish_draft(42,payload,expected_status='trash')
+        self.assertEqual(api.request.call_count,1)
+
     def test_draft_catalogue_remains_unpublished(self):
         plan = prepare_csv(self.csv([{'UGS': 'NEW', 'Nom': 'Article', 'Publié': '-1', 'En stock ?': '0'}]), self.api)
         self.assertEqual(plan['errors'], [])
