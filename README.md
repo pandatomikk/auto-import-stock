@@ -1,4 +1,4 @@
-# Auto Import Stock · V0.33
+# Auto Import Stock · V0.34
 
 **Moins de saisie, plus de temps pour votre commerce : préparez et ajoutez vos produits sur WooCommerce à partir des fichiers de vos fournisseurs.**
 
@@ -361,7 +361,7 @@ En ligne de commande, utiliser `--test-products` pour le test et `--all-products
 
 Configuration du pack privé dans Ma boutique, création de marques WooCommerce, classement des produits piloté par les profils privés, et images par référence/couleur en une étape. Mettre à jour le moteur avant le pack client.
 
-À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.33 sera 0.34, sauf demande explicite différente.
+À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.34 sera 0.35, sauf demande explicite différente.
 
 ## Version 0.22
 
@@ -426,3 +426,7 @@ Le moteur propose la composition de champs depuis plusieurs colonnes et la lectu
 Un refus WooCommerce pour UGS déjà présente ignore cet article et laisse continuer le lot ; le rapport indique désormais ce résultat sans annoncer une création non confirmée. Après un envoi d’image non confirmé, la médiathèque est interrogée une fois : une correspondance non ambiguë est réutilisée sans nouvel envoi. Cette version documente également ces deux correctifs précédemment publiés sous le numéro 0.32.
 
 Les produits absents du catalogue sont également recherchés dans la corbeille. Pour un CSV demandant la publication, l’aperçu affiche « Restaurer et publier » : la fiche existante est mise à jour avec le même identifiant, après vérification de son statut. Le rapport distingue les produits restaurés. Un CSV en brouillon ne restaure pas automatiquement un produit supprimé.
+
+## Version 0.34
+
+Téléchargement explicite des fichiers publics Google Drive, avec contrôle des réponses et limite de taille. Le pack privé compatible reprend les images en échec une par une et conserve les images déjà récupérées. Si les téléchargements restent incomplets, la préparation s’arrête sans générer de nouveau CSV de publication. Les références sans correspondance photo restent signalées séparément.
