@@ -1,4 +1,4 @@
-# Auto Import Stock · V0.32
+# Auto Import Stock · V0.33
 
 **Moins de saisie, plus de temps pour votre commerce : préparez et ajoutez vos produits sur WooCommerce à partir des fichiers de vos fournisseurs.**
 
@@ -361,7 +361,7 @@ En ligne de commande, utiliser `--test-products` pour le test et `--all-products
 
 Configuration du pack privé dans Ma boutique, création de marques WooCommerce, classement des produits piloté par les profils privés, et images par référence/couleur en une étape. Mettre à jour le moteur avant le pack client.
 
-À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.32 sera 0.33, sauf demande explicite différente.
+À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.33 sera 0.34, sauf demande explicite différente.
 
 ## Version 0.22
 
@@ -420,3 +420,7 @@ En mode ZIP imbriqués, les noms de fichiers répétés sont comparés par conte
 ## Version 0.32
 
 Le moteur propose la composition de champs depuis plusieurs colonnes et la lecture bornée des ZIP imbriqués, activées par configuration. Les photos de même nom et de contenu identique sont dédupliquées ; des contenus différents restent bloquants. Le pack privé ajoute GUESS sans adaptateur dédié, avec quantités nettes, prix publics, catégories et association des photos. Mettre à jour le logiciel avant d’actualiser le pack privé, puis redémarrer.
+
+## Version 0.33
+
+Un refus WooCommerce pour UGS déjà présente ignore cet article et laisse continuer le lot ; le rapport indique désormais ce résultat sans annoncer une création non confirmée. Après un envoi d’image non confirmé, la médiathèque est interrogée une fois : une correspondance non ambiguë est réutilisée sans nouvel envoi. Cette version documente également ces deux correctifs précédemment publiés sous le numéro 0.32.

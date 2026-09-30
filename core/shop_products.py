@@ -56,7 +56,9 @@ def api_error(exc, credentials, writing):
         and bool(re.search(r'\b(?:sku|ugs)\b.*(?:already|d[ée]j[àa]).*(?:exist|pr[ée]sent|use)|(?:exist|pr[ée]sent|use).*\b(?:sku|ugs)\b', message, re.IGNORECASE))
     )
     explanation = f'API : HTTP {status}' + (f' — {text}' if text else '. Aucun détail exploitable retourné par le serveur.')
-    if writing:
+    if writing and duplicate_sku:
+        explanation += ' Article ignoré : cette UGS est déjà présente. Le traitement du lot continue.'
+    elif writing:
         explanation += ' Article refusé avant création : corrigez les champs indiqués.' if rejected else ' Création non confirmée : vérifiez la boutique avant de relancer.'
     return ProductRequestFailure(explanation, rejected=rejected, duplicate_sku=duplicate_sku)
 

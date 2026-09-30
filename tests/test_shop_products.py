@@ -164,6 +164,18 @@ class ProductTests(unittest.TestCase):
         failure = api_error(response, Credentials('https://shop.example', consumer_key='key', consumer_secret='secret'), writing=True)
         self.assertTrue(failure.duplicate_sku)
         self.assertFalse(failure.rejected)
+        self.assertIn('Article ignoré', str(failure))
+        self.assertIn('Le traitement du lot continue', str(failure))
+        self.assertNotIn('Création non confirmée', str(failure))
+
+    def test_unrelated_creation_error_remains_unconfirmed(self):
+        response = Mock()
+        response.code = 400
+        response.read.return_value = json.dumps({'code':'woocommerce_rest_product_not_created', 'message':'Erreur serveur pendant la création'}).encode()
+        failure = api_error(response, Credentials('https://shop.example'), writing=True)
+        self.assertFalse(failure.duplicate_sku)
+        self.assertIn('Création non confirmée', str(failure))
+        self.assertNotIn('Le traitement du lot continue', str(failure))
 
     @patch('core.shop_products.build_opener')
     def test_transport_never_updates_and_uses_json(self, opener):
