@@ -48,26 +48,33 @@ class ImageArchive:
                 self._scan(child, virtual + '/', nested, depth + 1, max_depth, max_bytes, max_entries)
             else:
                 if virtual in self.sources:
-                    raise ValueError('Chemin présent plusieurs fois dans le ZIP : ' + virtual)
+                    previous_archive, previous = self.sources[virtual]
+                    if (original.file_size != previous.file_size or
+                            self._digest(archive, original) != self._digest(previous_archive, previous)):
+                        raise ValueError('Nom image ambigu, contenus différents dans le ZIP : ' + virtual)
+                    continue
                 info = copy.copy(original)
                 info.filename = virtual
                 self.entries.append(info)
                 self.sources[virtual] = (archive, original)
 
+    @staticmethod
+    def _digest(archive, original):
+        value = hashlib.sha256()
+        # Use ZipInfo, not its name: duplicate names can refer to different bytes.
+        with archive.open(original) as source:
+            for block in iter(lambda: source.read(1024 * 1024), b''):
+                value.update(block)
+        return value.digest()
+
     def _deduplicate(self):
         by_name = {}
         kept = []
-        def digest(info):
-            value = hashlib.sha256()
-            with self.open(info) as source:
-                for block in iter(lambda: source.read(1024 * 1024), b''):
-                    value.update(block)
-            return value.digest()
         for info in self.entries:
             name = PurePosixPath(info.filename).name
             previous = by_name.get(name)
             if previous is not None:
-                if info.file_size != previous.file_size or digest(info) != digest(previous):
+                if info.file_size != previous.file_size or self._digest(*self.sources[info.filename]) != self._digest(*self.sources[previous.filename]):
                     raise ValueError('Nom image ambigu, contenus différents dans les ZIP : ' + name)
                 continue
             by_name[name] = info
