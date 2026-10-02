@@ -46,6 +46,7 @@ def settings():
 
 def bundle(root, phase, outcome):
     """Allowlist diagnostics only: never sources, product CSVs, settings or images."""
+    root = Path(root).resolve()
     data = io.BytesIO()
     size = 0
     skipped = []
