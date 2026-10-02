@@ -430,3 +430,7 @@ Les produits absents du catalogue sont également recherchés dans la corbeille.
 ## Version 0.34
 
 Téléchargement explicite des fichiers publics Google Drive, avec contrôle des réponses et limite de taille. Le pack privé compatible reprend les images en échec une par une et conserve les images déjà récupérées. Si les téléchargements restent incomplets, la préparation s’arrête sans générer de nouveau CSV de publication. Les références sans correspondance photo restent signalées séparément.
+
+### Enrichissement par catalogue public Shopify (dev)
+
+Le fournisseur `supplier_descriptions.provider: shopify_catalog` recherche une variante par référence exacte dans un catalogue public paginé. Le profil configure `base_url`, `reference_field` et, si nécessaire, `reference_remove_chars`. Une référence absente, ambiguë ou associée à un EAN différent conserve la description générique et apparaît dans le rapport. Cette fonction ne remplace ni le prix du fichier source ni les photos du ZIP.

@@ -7,6 +7,11 @@ class SupplierDescriptions:
         self.provider = None
         self.records = []
         if settings.get('enabled'):
+            if settings.get('provider') == 'shopify_catalog':
+                from .shopify_descriptions import SupplierDescriptions as CatalogDescriptions
+                self.provider = CatalogDescriptions(settings)
+                self.records = self.provider.records
+                return
             if not settings.get('adapter'):
                 raise ValueError('Un adaptateur local est requis pour enrichir les descriptions.')
             self.provider = load_adapter(settings['adapter']).SupplierDescriptions(settings)
