@@ -124,7 +124,25 @@ class ProductsDialog(tk.Toplevel):
         self.detail('Rapport : ' + str(self.report_path))
         from core.shop_publication import publish_plan
         operation = publish_plan if self.publication else import_plan
-        self.run('report', lambda: operation(self.plan, self.api, self.report_path, self.progress))
+        plan, report_path = self.plan, self.report_path
+        def execute():
+            from core.diagnostic_cloud import submit, scrub
+            log_path = report_path.with_name('diagnostic_' + report_path.stem + '.txt')
+            outcome = 'interrompu'
+            def progress(text):
+                with log_path.open('a', encoding='utf-8') as log:
+                    log.write(scrub(str(text)) + '\n')
+                self.progress(text)
+            try:
+                result = operation(plan, self.api, report_path, progress)
+                outcome = 'terminé ; voir le rapport pour les résultats par produit'
+                return result
+            except Exception as exc:
+                outcome = scrub(str(exc))
+                raise
+            finally:
+                submit(report_path.parent, 'import', outcome)
+        self.run('report', execute)
 
     def poll(self):
         self.timer = None

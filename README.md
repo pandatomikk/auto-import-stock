@@ -438,3 +438,7 @@ Le fournisseur `supplier_descriptions.provider: shopify_catalog` recherche une v
 ### Compléter les images des produits publiés (dev)
 
 Lors du contrôle du CSV, un produit publié dont la galerie est vide peut recevoir les images du CSV. L’aperçu indique « Ajouter les images ». Les photos sont réutilisées dans la médiathèque ou envoyées avant la mise à jour, qui ne contient que les images : prix, stocks et descriptions sont conservés. Une galerie déjà renseignée est laissée intacte ; l’état est revérifié avant les envois et avant la modification du produit.
+
+### Collecte facultative des diagnostics (dev)
+
+Le pack privé peut activer `diagnostic_cloud` dans `client.json` avec `enabled` et une `share_url` HTTPS Nextcloud. Après une préparation ou un import lancé depuis l’interface, une archive datée contient les rapports JSON et journaux de diagnostic, avec version et résultat. Les sources, CSV produits, images et fichiers de configuration ne sont pas collectés ; les champs de secrets reconnus sont masqués. Les diagnostics de plus de 8 Mo (ou dépassant 24 Mo au total) sont omis et listés dans le manifeste. Le dépôt WebDAV se fait en arrière-plan, sans suivre les redirections. Une copie locale reste dans `.diagnostics_cloud` ; les envois échoués sont retentés à la prochaine fin d’exécution du même dossier de résultats. `diagnostic_cloud_status.json` indique le dernier résultat. Fermer l’application pendant un envoi peut le laisser en attente.

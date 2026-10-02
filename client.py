@@ -247,7 +247,8 @@ class Client(tk.Tk):
   if self.is_two_pass() or not self.web.get() or self.configs[self.brand.get()].get('images',{}).get('mode')=='none':args+=['--no-web-descriptions']
   self.workflow_result=None;self.failure_detail=None
   try:
-   with tempfile.NamedTemporaryFile(prefix='auto-stock-',suffix='.txt',delete=False) as log:self.diagnostic=Path(log.name)
+   self.diagnostic=Path(tempfile.mkdtemp(prefix='auto-stock-'))/'diagnostic_preparation.txt'
+   self.diagnostic.touch()
   except OSError:
    messagebox.showerror('Dossier inaccessible','Choisissez un fichier dans un dossier où vous pouvez enregistrer les résultats.');return
   self.start_button.configure(state='disabled');self.stop_button.configure(state='normal');self.open_button.configure(state='disabled')
@@ -327,6 +328,9 @@ class Client(tk.Tk):
     with self.diagnostic.open('a',encoding='utf-8') as f:f.write(text+'\n')
    except OSError:pass
  def finish(self,message):
+  if self.diagnostic:
+   from core.diagnostic_cloud import submit
+   submit(self.diagnostic.parent,'preparation',message)
   self.proc=None;self.bar.stop();self.status.set(message);self.eta.set('')
   if hasattr(self,'started_at'):
    elapsed=int(time.monotonic()-self.started_at);self.activity.set(f'Durée : {elapsed//60} min {elapsed%60:02d} s')
