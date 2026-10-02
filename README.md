@@ -1,4 +1,4 @@
-# Auto Import Stock · V0.35
+# Auto Import Stock · V0.36
 
 **Moins de saisie, plus de temps pour votre commerce : préparez et ajoutez vos produits sur WooCommerce à partir des fichiers de vos fournisseurs.**
 
@@ -361,7 +361,7 @@ En ligne de commande, utiliser `--test-products` pour le test et `--all-products
 
 Configuration du pack privé dans Ma boutique, création de marques WooCommerce, classement des produits piloté par les profils privés, et images par référence/couleur en une étape. Mettre à jour le moteur avant le pack client.
 
-À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.35 sera 0.36, sauf demande explicite différente.
+À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.36 sera 0.37, sauf demande explicite différente.
 
 ## Version 0.22
 
@@ -446,3 +446,7 @@ Lors du contrôle du CSV, un produit publié dont la galerie est vide peut recev
 ### Collecte facultative des diagnostics
 
 Le pack privé peut activer `diagnostic_cloud` dans `client.json` avec `enabled` et une `share_url` HTTPS Nextcloud. Après une préparation ou un import lancé depuis l’interface, une archive datée contient les rapports JSON et journaux de diagnostic, avec version et résultat. Les sources, CSV produits, images et fichiers de configuration ne sont pas collectés ; les champs de secrets reconnus sont masqués. Les diagnostics de plus de 8 Mo (ou dépassant 24 Mo au total) sont omis et listés dans le manifeste. Le dépôt WebDAV se fait en arrière-plan, sans suivre les redirections. Une copie locale reste dans `.diagnostics_cloud` ; les envois échoués sont retentés à la prochaine fin d’exécution du même dossier de résultats. `diagnostic_cloud_status.json` indique le dernier résultat. Fermer l’application pendant un envoi peut le laisser en attente.
+
+## Version 0.36
+
+Calcul du prix de vente configurable par profil, avec arithmétique décimale et arrondi à deux décimales. Le pack privé Le Tanneur applique désormais `PU ÷ 0,95 × 2,5`, PU étant le prix d’achat. Régénérer les CSV après mise à jour du moteur et du pack ; les tarifs des produits déjà publiés ne sont pas modifiés automatiquement.

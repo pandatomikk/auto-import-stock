@@ -1,3 +1,3 @@
 """Application release shared by UI and HTTP clients."""
-VERSION = "0.35"
+VERSION = "0.36"
 USER_AGENT = "AutoImportStock/" + VERSION
