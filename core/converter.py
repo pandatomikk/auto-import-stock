@@ -637,6 +637,9 @@ def convert_catalogue(
             elif value is None:
                 value = ""
 
+            if logical == 'regular_price' and config.get('price_calculation'):
+                from .pricing import sale_price
+                value = sale_price(source_row.get(info['source'], ''), config['price_calculation'])
             out[wc_col] = value
 
         generated_category = category_from_rules(
