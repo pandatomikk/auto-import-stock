@@ -92,7 +92,7 @@ def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=up
             temporary.write_text(json.dumps(journal, ensure_ascii=False, indent=2), encoding='utf-8')
             temporary.replace(journal_path)
         prepared = copy.deepcopy(plan)
-        # Recheck before media uploads: existing articles need no new photos.
+        # Recheck before media uploads, including image-only updates.
         needed = set()
         for item in prepared['items']:
             if item['state'] == 'new' and api.existing(item['sku']):
@@ -102,6 +102,12 @@ def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=up
                 if not current:
                     raise ConnectionFailure('Brouillon introuvable : recommencez le contrôle.')
                 if len(current) != 1 or current[0].get('id') != item['product_id'] or current[0].get('status') != item.get('original_status', 'draft') or current[0].get('sku') != item['sku']:
+                    item['state'] = 'existing'; item.pop('payload', None)
+            if item['state'] == 'images_update':
+                current = api.existing(item['sku'])
+                if (len(current) != 1 or current[0].get('id') != item['product_id']
+                        or current[0].get('sku') != item['sku'] or current[0].get('status') != 'publish'
+                        or current[0].get('images') != []):
                     item['state'] = 'existing'; item.pop('payload', None)
             needed.update(image['_local_path'] for image in item.get('payload', {}).get('images', []) if '_local_path' in image)
         from core.media_library import MediaLibrary, generated_identity, upload_name, normalized_name

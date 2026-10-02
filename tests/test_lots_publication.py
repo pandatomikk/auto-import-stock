@@ -33,6 +33,41 @@ class LotsPublicationTests(unittest.TestCase):
             return {'id':33,'url':'https://shop.example/uploads/photo-1.webp','filename':'photo-1.webp'}
         self.upload = Mock(side_effect=upload)
 
+    def test_published_product_without_images_is_completed_and_then_skipped(self):
+        from core.shop_products import ProductAPI
+        write_csv(self.csv, ['UGS', 'Nom', 'Images', 'Stock'],
+                  [{'UGS': 'OLD', 'Nom': 'Changed name', 'Images': 'photo.webp', 'Stock': '999'}])
+        current = {'id': 42, 'sku': 'OLD', 'status': 'publish', 'images': [], 'name': 'Original', 'stock_quantity': 3}
+        self.api.products['OLD'] = current
+        writes = []
+        def request(route, payload=None, method=None):
+            if method == 'PUT':
+                writes.append(payload)
+                current.update(payload)
+            return dict(current)
+        self.api.request = request
+        self.api.complete_images = lambda pid, sku, images: ProductAPI.complete_images(self.api, pid, sku, images)
+        plan = prepare_publication(self.csv, self.api)
+        self.assertEqual(plan['items'][0]['state'], 'images_update')
+        report = publish_plan(plan, self.api, self.root/'complete.json', uploader=self.upload)
+        self.assertEqual(report['results'][0]['state'], 'images_updated')
+        self.assertEqual(writes, [{'images': [{'id': 33}]}])
+        self.assertEqual(current['name'], 'Original')
+        self.assertEqual(current['stock_quantity'], 3)
+        plan = prepare_publication(self.csv, self.api)
+        self.assertEqual(plan['items'][0]['state'], 'existing')
+        publish_plan(plan, self.api, self.root/'again.json', uploader=self.upload)
+        self.assertEqual(self.upload.call_count, 1)
+
+    def test_images_added_after_preview_prevent_upload(self):
+        write_csv(self.csv, ['UGS', 'Nom', 'Images'], [{'UGS': 'OLD', 'Nom': 'Article', 'Images': 'photo.webp'}])
+        self.api.products['OLD'] = {'id': 42, 'sku': 'OLD', 'status': 'publish', 'images': []}
+        plan = prepare_publication(self.csv, self.api)
+        self.api.products['OLD']['images'] = [{'id': 99}]
+        report = publish_plan(plan, self.api, self.root/'race.json', uploader=self.upload)
+        self.upload.assert_not_called()
+        self.assertEqual(report['results'][0]['state'], 'skipped')
+
     def test_lot_copies_originals_and_attaches_second_archive(self):
         archive = self.root / 'photos.zip'; archive.write_bytes(b'original')
         a, source, copied = create_lot(self.csv, 'Demo / Boutique', archive, root=self.root/'lots')

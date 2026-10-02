@@ -434,3 +434,7 @@ Téléchargement explicite des fichiers publics Google Drive, avec contrôle des
 ### Enrichissement par catalogue public Shopify (dev)
 
 Le fournisseur `supplier_descriptions.provider: shopify_catalog` recherche une variante par référence exacte dans un catalogue public paginé. Le profil configure `base_url`, `reference_field` et, si nécessaire, `reference_remove_chars`. Une référence absente, ambiguë ou associée à un EAN différent conserve la description générique et apparaît dans le rapport. Cette fonction ne remplace ni le prix du fichier source ni les photos du ZIP.
+
+### Compléter les images des produits publiés (dev)
+
+Lors du contrôle du CSV, un produit publié dont la galerie est vide peut recevoir les images du CSV. L’aperçu indique « Ajouter les images ». Les photos sont réutilisées dans la médiathèque ou envoyées avant la mise à jour, qui ne contient que les images : prix, stocks et descriptions sont conservés. Une galerie déjà renseignée est laissée intacte ; l’état est revérifié avant les envois et avant la modification du produit.

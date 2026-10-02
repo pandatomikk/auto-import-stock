@@ -123,6 +123,23 @@ class ProductAPI:
             raise ConnectionFailure('Le produit a changé : recommencez le contrôle.')
         return self.request(route, payload=payload, method='PUT')
 
+    def complete_images(self, product_id, sku, images):
+        route = 'wc/v3/products/' + str(int(product_id))
+        current = self.request(route)
+        if current.get('id') != product_id or current.get('sku') != sku or current.get('status') != 'publish':
+            raise ConnectionFailure('Le produit a changé : recommencez le contrôle.')
+        if current.get('images') != []:
+            return None
+        if not images:
+            raise ConnectionFailure('Aucune image à ajouter.')
+        result = self.request(route, payload={'images': images}, method='PUT')
+        expected = {image['id'] for image in images if 'id' in image}
+        actual = {image.get('id') for image in result.get('images', [])} if isinstance(result, dict) else set()
+        if (not isinstance(result, dict) or result.get('id') != product_id or result.get('sku') != sku
+                or not result.get('images') or not expected.issubset(actual)):
+            raise ConnectionFailure('Ajout des images non confirmé : vérifiez la boutique.')
+        return result
+
     def create_brand(self, name):
         name = name.strip()
         if not name:
@@ -357,6 +374,14 @@ def prepare_csv(path, api, progress=lambda text: None, mappings=None, image_over
             if existing and existing[0].get('status') == 'trash' and row.get('Publié', '1') != '1':
                 raise ConnectionFailure('Produit dans la corbeille : le CSV doit demander la publication pour le restaurer.')
             draft = len(existing) == 1 and existing[0].get("status") in ("draft", "trash") and existing[0].get("sku") == sku and row.get("Publié", "1") == "1"
+            if (len(existing) == 1 and existing[0].get('status') == 'publish'
+                    and existing[0].get('sku') == sku and existing[0].get('images') == []
+                    and row.get('Images', '').strip()):
+                images = resolver.images(row['Images'])
+                if images:
+                    plan['items'].append({'line': index, 'sku': sku, 'name': row.get('Nom', ''),
+                        'state': 'images_update', 'product_id': existing[0]['id'], 'payload': {'images': images}})
+                    continue
             if existing and not draft:
                 plan['items'].append({'line': index, 'sku': sku, 'name': row.get('Nom', ''), 'state': 'existing'})
                 continue
@@ -396,9 +421,16 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
         existing = api.existing(item['sku'])
         updating = item['state'] == 'draft_update'
         valid_draft = updating and len(existing) == 1 and existing[0].get('id') == item['product_id'] and existing[0].get('status') == item.get('original_status', 'draft') and existing[0].get('sku') == item['sku']
+        image_update = item['state'] == 'images_update'
+        valid_images = image_update and len(existing) == 1 and existing[0].get('id') == item['product_id'] and existing[0].get('sku') == item['sku'] and existing[0].get('status') == 'publish' and existing[0].get('images') == []
+        if image_update and not valid_images:
+            record['state'] = 'skipped'
+            report['results'].append(record); save()
+            product_progress.update(time.monotonic() - started, cached=True)
+            continue
         if updating and not existing:
             raise ConnectionFailure('Brouillon introuvable : recommencez le contrôle.')
-        if existing and not valid_draft:
+        if existing and not valid_draft and not valid_images:
             record['state'] = 'skipped'
             report['results'].append(record); save()
             product_progress.update(time.monotonic() - started, cached=True)
@@ -407,7 +439,14 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
         record['state'] = 'unconfirmed'
         report['results'].append(record); save()
         try:
-            if updating and item.get('original_status') == 'trash':
+            if image_update:
+                result = api.complete_images(item['product_id'], item['sku'], item['payload']['images'])
+                if result is None:
+                    record['state'] = 'skipped'
+                    save()
+                    product_progress.update(time.monotonic() - started, cached=True)
+                    continue
+            elif updating and item.get('original_status') == 'trash':
                 result = api.publish_draft(item['product_id'], item['payload'], expected_status='trash')
             else:
                 result = api.publish_draft(item['product_id'], item['payload']) if updating else api.create(item['payload'])
@@ -415,7 +454,7 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
                 raise ConnectionFailure('Publication du brouillon non confirmée : vérifiez la boutique.')
             if not isinstance(result, dict) or not isinstance(result.get('id'), int) or result['id'] <= 0 or result.get('sku') != item['sku']:
                 raise ConnectionFailure('Création non confirmée : vérifiez la boutique avant de relancer.')
-            record.update(state=('restored' if item.get('original_status') == 'trash' else 'updated') if updating else 'created', id=result['id'], url=result.get('permalink', ''))
+            record.update(state=('restored' if item.get('original_status') == 'trash' else 'updated') if updating else ('images_updated' if image_update else 'created'), id=result['id'], url=result.get('permalink', ''))
         except ConnectionFailure as exc:
             record['message'] = str(exc)
             if getattr(exc, 'duplicate_sku', False):
