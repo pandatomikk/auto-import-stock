@@ -1,4 +1,4 @@
-# Auto Import Stock · V0.34
+# Auto Import Stock · V0.35
 
 **Moins de saisie, plus de temps pour votre commerce : préparez et ajoutez vos produits sur WooCommerce à partir des fichiers de vos fournisseurs.**
 
@@ -361,7 +361,7 @@ En ligne de commande, utiliser `--test-products` pour le test et `--all-products
 
 Configuration du pack privé dans Ma boutique, création de marques WooCommerce, classement des produits piloté par les profils privés, et images par référence/couleur en une étape. Mettre à jour le moteur avant le pack client.
 
-À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.34 sera 0.35, sauf demande explicite différente.
+À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.35 sera 0.36, sauf demande explicite différente.
 
 ## Version 0.22
 
@@ -431,14 +431,18 @@ Les produits absents du catalogue sont également recherchés dans la corbeille.
 
 Téléchargement explicite des fichiers publics Google Drive, avec contrôle des réponses et limite de taille. Le pack privé compatible reprend les images en échec une par une et conserve les images déjà récupérées. Si les téléchargements restent incomplets, la préparation s’arrête sans générer de nouveau CSV de publication. Les références sans correspondance photo restent signalées séparément.
 
-### Enrichissement par catalogue public Shopify (dev)
+## Version 0.35
+
+Ajout du profil Le Tanneur dans le pack privé compatible, acceptation des entrées ZIP strictement identiques, ajout des images aux produits publiés sans photo et collecte facultative des diagnostics sur un partage Nextcloud configuré dans le pack client.
+
+### Enrichissement par catalogue public Shopify
 
 Le fournisseur `supplier_descriptions.provider: shopify_catalog` recherche une variante par référence exacte dans un catalogue public paginé. Le profil configure `base_url`, `reference_field` et, si nécessaire, `reference_remove_chars`. Une référence absente, ambiguë ou associée à un EAN différent conserve la description générique et apparaît dans le rapport. Cette fonction ne remplace ni le prix du fichier source ni les photos du ZIP.
 
-### Compléter les images des produits publiés (dev)
+### Compléter les images des produits publiés
 
 Lors du contrôle du CSV, un produit publié dont la galerie est vide peut recevoir les images du CSV. L’aperçu indique « Ajouter les images ». Les photos sont réutilisées dans la médiathèque ou envoyées avant la mise à jour, qui ne contient que les images : prix, stocks et descriptions sont conservés. Une galerie déjà renseignée est laissée intacte ; l’état est revérifié avant les envois et avant la modification du produit.
 
-### Collecte facultative des diagnostics (dev)
+### Collecte facultative des diagnostics
 
 Le pack privé peut activer `diagnostic_cloud` dans `client.json` avec `enabled` et une `share_url` HTTPS Nextcloud. Après une préparation ou un import lancé depuis l’interface, une archive datée contient les rapports JSON et journaux de diagnostic, avec version et résultat. Les sources, CSV produits, images et fichiers de configuration ne sont pas collectés ; les champs de secrets reconnus sont masqués. Les diagnostics de plus de 8 Mo (ou dépassant 24 Mo au total) sont omis et listés dans le manifeste. Le dépôt WebDAV se fait en arrière-plan, sans suivre les redirections. Une copie locale reste dans `.diagnostics_cloud` ; les envois échoués sont retentés à la prochaine fin d’exécution du même dossier de résultats. `diagnostic_cloud_status.json` indique le dernier résultat. Fermer l’application pendant un envoi peut le laisser en attente.
