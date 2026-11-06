@@ -361,7 +361,7 @@ En ligne de commande, utiliser `--test-products` pour le test et `--all-products
 
 Configuration du pack privé dans Ma boutique, création de marques WooCommerce, classement des produits piloté par les profils privés, et images par référence/couleur en une étape. Mettre à jour le moteur avant le pack client.
 
-À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.36 sera 0.37, sauf demande explicite différente.
+À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.37 sera 0.38, sauf demande explicite différente.
 
 ## Version 0.22
 
@@ -451,22 +451,26 @@ Le pack privé peut activer `diagnostic_cloud` dans `client.json` avec `enabled`
 
 Calcul du prix de vente configurable par profil, avec arithmétique décimale et arrondi à deux décimales. Le pack privé Le Tanneur applique désormais `PU ÷ 0,95 × 2,5`, PU étant le prix d’achat. Régénérer les CSV après mise à jour du moteur et du pack ; les tarifs des produits déjà publiés ne sont pas modifiés automatiquement.
 
-### Envoi en brouillon par défaut (en développement)
+### Envoi en brouillon par défaut (version 0.37)
 
 L’écran principal propose, entre le test sur cinq produits et la récupération des descriptions, « Envoyer les nouveaux produits en brouillon », cochée par défaut. Le choix s’applique au contrôle et à l’envoi, sans modifier le CSV. Les brouillons existants ne sont pas publiés dans ce mode. Décochez la case pour respecter le statut du CSV, notamment pour publier les brouillons existants. Le choix est repris à l’ouverture de la fenêtre d’envoi ; l’aperçu distingue « Créer en brouillon » et « Créer et publier ».
 
-### Contrôle des doublons par nom (en développement)
+### Contrôle des doublons par nom (version 0.37)
 
 Le contrôle depuis l’interface compare les nouveaux produits au catalogue WooCommerce et aux lignes précédentes du lot. Il normalise casse, accents, ponctuation, ordre des mots et particules ; une liste limitée de synonymes et une comparaison prudente signalent aussi des noms proches. Un EAN identique est signalé même si les noms diffèrent. Deux EAN renseignés différents, des marques connues distinctes ou des différences connues de couleur, taille ou numéro de modèle écartent le rapprochement par nom. Les informations absentes ne permettent pas de garantir que deux modèles sont identiques.
 
 Avant tout envoi, chaque produit signalé demande « Ignorer ce produit » ou « Créer quand même », avec les noms, UGS et l’origine des correspondances. Revenir au contrôle laisse l’envoi en attente. Aucun produit n’est fusionné automatiquement. Les décisions et correspondances sont conservées dans le rapport d’import ; elles sont redemandées après un nouveau contrôle. Les doublons apparus sur la boutique après le contrôle restent couverts par la vérification existante des UGS, mais les noms ne sont pas rescannés pendant l’envoi.
 
-### Plusieurs sources Google Drive (en développement)
+### Plusieurs sources Google Drive (version 0.37)
 
 Pour Cabaïa, « Gérer les liens… » à côté du champ « Dossiers Google Drive » ouvre une liste : saisir un lien de dossier public par ligne. Tous les liens sont inventoriés avant téléchargement, puis les photos sont rapprochées des références du catalogue. Les liens répétés et les fichiers ayant le même identifiant Drive sont dédupliqués. Des copies distinctes ayant des identifiants différents restent des fichiers distincts. Un inventaire en erreur bloque le traitement pour éviter un résultat partiel présenté comme complet. Le rapport conserve les sources et leurs statistiques. La recherche ciblée et le cache des dossiers existants sont conservés ; `--refresh-drive` force un nouvel inventaire et `--full-drive` désactive le filtrage des sous-dossiers.
 
 Cette évolution nécessite le moteur et le pack privé compatibles. En CLI, `--drive-url` accepte une liste entre guillemets, séparée par des points-virgules ou des retours à la ligne.
 
-### Estimation de la recherche Drive (en développement)
+### Estimation de la recherche Drive (version 0.37)
 
 La recherche des photos affiche le nombre de produits couverts sur l’ensemble des sources et un temps restant approximatif. La moyenne est calculée dès les premières correspondances, puis recalculée tous les dix nouveaux produits couverts, à partir du temps écoulé depuis le début de l’inventaire. Plusieurs photos d’un produit ou sa présence dans plusieurs sources ne le comptent qu’une fois. Les produits sans photo et les durées variables des dossiers rendent cette projection indicative : elle ne garantit pas la durée de fin d’exploration. Les sources continuent d’être vérifiées même lorsque tous les produits ont une correspondance. Le téléchargement conserve son compteur distinct.
+
+## Version 0.37
+
+Création en brouillon par défaut depuis la case de l’écran principal, contrôle des doublons probables avec choix explicite, plusieurs sources Drive Cabaïa avec estimation de recherche et diagnostics par source. Le pack privé compatible ajoute Excel Cabaïa, accepte les dossiers publics vides, ignore les produits sans photo pour les descriptions et le CSV final, et extrait les sections de description détaillée et de composition/entretien. Les sections absentes ou inaccessibles restent signalées ; la validation réelle complète de cette extraction est prévue au prochain batch, les requêtes fournisseur ayant été limitées par HTTP 429 pendant le développement. Mettre à jour le moteur avant le pack privé, redémarrer puis régénérer les CSV.
