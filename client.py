@@ -248,7 +248,7 @@ class Client(tk.Tk):
    messagebox.showerror('Images','Récupère les images sur la plateforme fournisseur, puis sélectionne leur ZIP pour finaliser.');return
   if workflow_kind(self.configs[self.brand.get()])=='invoice' and not self.drive.get().strip():messagebox.showerror('Drive','Renseigne le lien du dossier Drive.');return
   if (not self.is_two_pass() and self.configs[self.brand.get()].get('images',{}).get('mode') in {'zip_by_sku','zip_pattern'}) and not Path(self.drive.get()).is_file():messagebox.showerror('Images','Sélectionne le ZIP des images.');return
-  self.folder=source.resolve().parent;self.stopped=False;self.eta.set('Temps restant : calcul en cours…')
+  self.folder=source.resolve().parent;self.stopped=False;self.drive_search_active=False;self.eta.set('Temps restant : calcul en cours…')
   python_exe=str(Path(sys.executable).with_name('python.exe')) if os.name=='nt' and Path(sys.executable).name.lower()=='pythonw.exe' else sys.executable
   args=[python_exe,'-u',str(ROOT/'lancer.py'),'--supplier',self.brand.get(),'--source',str(source.resolve())]
   if self.resume_path:
@@ -315,6 +315,13 @@ class Client(tk.Tk):
     self.eta.set('');continue
    if data.startswith('ZPSI_WORKFLOW '):
     self.workflow_result=json.loads(data[len('ZPSI_WORKFLOW '):]);self.record(data);continue
+   if data.startswith('ZPSI_DRIVE_SEARCH '):
+    event=json.loads(data[len('ZPSI_DRIVE_SEARCH '):]);self.record(data);self.drive_search_active=True
+    self.bar.stop();self.bar.configure(mode='determinate',maximum=max(1,event['total']),value=event['done'])
+    self.stage.set('Recherche des photos Google Drive')
+    self.status.set(f"Photos trouvées pour {event['done']}/{event['total']} produits · exploration des sources")
+    from core.progress import format_drive_eta
+    self.eta.set(format_drive_eta(event));continue
    if data.startswith('ZPSI_LOCAL_IMAGES '):
     event=json.loads(data[len('ZPSI_LOCAL_IMAGES '):]);self.bar.stop();self.bar.configure(mode='determinate',maximum=max(1,event['total']),value=event['done'])
     from core.progress import format_image_eta
@@ -328,6 +335,8 @@ class Client(tk.Tk):
    else:
     self.record(data)
     if data.startswith('ERREUR préparation :'):self.failure_detail=data
+    if getattr(self,'drive_search_active',False) and data.startswith(('Dossiers lus','Recherche élargie')):
+     continue
     if data.startswith(('Dossiers lus','Recherche élargie','Descriptions :')):
      description=data.startswith('Descriptions :')
      self.stage.set('3  Descriptions' if description else '2  Recherche des images')

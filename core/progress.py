@@ -76,3 +76,47 @@ def publication_status(label, tracker, current=''):
     else:
         estimate = format_image_eta(seconds).replace('Temps restant pour les images : ', 'temps restant : ')
     return f"{label} : {event['done']}/{event['total']} · {estimate}" + (' · ' + current if current else '')
+
+
+class DriveSearchProgress:
+    """Estimate search time from unique covered products across all sources."""
+    def __init__(self, total, clock=None):
+        import time
+        self.clock = clock or time.monotonic
+        self.started = self.clock()
+        self.total = total
+        self.found = set()
+        self.average = None
+        self.checkpoint = 0
+
+    def update(self, references):
+        self.found.update(references)
+        done = len(self.found)
+        if done and (self.average is None or done >= self.checkpoint + 10):
+            self.average = max(0, self.clock() - self.started) / done
+            self.checkpoint = done
+        return self.snapshot()
+
+    def snapshot(self, finished=False):
+        done = len(self.found)
+        remaining = max(0, self.total - done)
+        eta = self.average * remaining if self.average is not None and remaining else None
+        return dict(done=done, total=self.total, eta=eta, finished=finished)
+
+    def emit(self, references=(), finished=False):
+        import json
+        self.update(references)
+        print('ZPSI_DRIVE_SEARCH ' + json.dumps(self.snapshot(finished)), flush=True)
+
+
+def format_drive_eta(event):
+    if event.get('finished'):
+        return 'Recherche terminée : ' + str(event['total'] - event['done']) + ' produit(s) sans correspondance photo.'
+    if event['done'] >= event['total']:
+        return 'Produits trouvés ; vérification des dossiers et sources restantes…'
+    if event.get('eta') is None:
+        return 'Temps restant estimé : calcul après le premier produit trouvé…'
+    if event['eta'] <= 0:
+        return 'Recherche Drive — temps restant estimé : moins de 1 s (approximatif)'
+    duration = format_image_eta(event['eta']).replace('Temps restant pour les images : ', '')
+    return 'Recherche Drive — temps restant estimé : ' + duration + ' (approximatif)'
