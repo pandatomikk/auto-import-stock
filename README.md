@@ -453,4 +453,4 @@ Calcul du prix de vente configurable par profil, avec arithmétique décimale et
 
 ### Envoi en brouillon par défaut (en développement)
 
-La fenêtre d’envoi propose « Envoyer les nouveaux produits en brouillon », cochée par défaut. Le choix s’applique au contrôle et à l’envoi, sans modifier le CSV. Les brouillons existants ne sont pas publiés dans ce mode. Décochez la case pour respecter le statut du CSV, notamment pour publier les brouillons existants. Tout changement relance le contrôle ; l’aperçu distingue « Créer en brouillon » et « Créer et publier ».
+L’écran principal propose, entre le test sur cinq produits et la récupération des descriptions, « Envoyer les nouveaux produits en brouillon », cochée par défaut. Le choix s’applique au contrôle et à l’envoi, sans modifier le CSV. Les brouillons existants ne sont pas publiés dans ce mode. Décochez la case pour respecter le statut du CSV, notamment pour publier les brouillons existants. Le choix est repris à l’ouverture de la fenêtre d’envoi ; l’aperçu distingue « Créer en brouillon » et « Créer et publier ».

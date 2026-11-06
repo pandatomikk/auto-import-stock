@@ -94,7 +94,7 @@ class ShopDialog(tk.Toplevel):
         from core.shop_products_ui import ProductsDialog
         credentials = Credentials(**{key: value.get() for key, value in self.values.items()})
         try:
-            self.products_dialog = ProductsDialog(self, credentials, publication=publication)
+            self.products_dialog = ProductsDialog(self, credentials, publication=publication, force_draft=self.parent.draft.get())
         except ConnectionFailure as exc:
             self.status.set(str(exc))
 

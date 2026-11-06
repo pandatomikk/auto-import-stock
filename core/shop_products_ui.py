@@ -13,7 +13,7 @@ from core.shop_products import ProductAPI, prepare_csv, import_plan
 
 
 class ProductsDialog(tk.Toplevel):
-    def __init__(self, owner, credentials, publication=False):
+    def __init__(self, owner, credentials, publication=False, force_draft=True):
         self.publication = publication
         self.api = ProductAPI(credentials)
         super().__init__(owner)
@@ -47,10 +47,9 @@ class ProductsDialog(tk.Toplevel):
         canvas.bind('<Configure>', lambda event: canvas.itemconfigure(window, width=event.width))
         ttk.Label(box, text='Publier un lot sur le site' if publication else 'Créer des articles depuis un CSV', font=('Arial', 16, 'bold')).pack(anchor='w')
         ttk.Label(box, text='Boutique : ' + self.api.url, wraplength=850).pack(anchor='w', pady=8)
-        ttk.Label(box, text=('Choisissez le CSV final du lot. Après contrôle, ses images locales seront envoyées puis ses nouveaux produits créés en brouillon par défaut. Décochez la case pour respecter le statut du CSV. Les brouillons et produits dans la corbeille ne seront publiés que dans ce dernier mode ; les produits publiés sans image recevront les photos du CSV.' if publication else 'Produits simples, créés en brouillon par défaut. Décochez la case pour respecter le statut du CSV et permettre la publication des brouillons existants. Les produits publiés sans image recevront les photos du CSV. Les images et les catégories doivent déjà exister sur le site.'), wraplength=850).pack(anchor='w')
-        self.draft = tk.BooleanVar(value=True)
-        self.draft_check = ttk.Checkbutton(box, text='Envoyer les nouveaux produits en brouillon', variable=self.draft, command=self.change_draft_mode)
-        self.draft_check.pack(anchor='w', pady=(8, 0))
+        ttk.Label(box, text=('Choisissez le CSV final du lot. Après contrôle, ses images locales seront envoyées puis ses nouveaux produits créés avec le statut choisi sur l’écran principal. En mode brouillon, les brouillons existants ne sont pas publiés ; les produits publiés sans image recevront les photos du CSV.' if publication else 'Produits simples, créés en brouillon par défaut. Le statut choisi sur l’écran principal s’applique aux nouveaux produits. Les produits publiés sans image recevront les photos du CSV. Les images et les catégories doivent déjà exister sur le site.'), wraplength=850).pack(anchor='w')
+        self.draft = tk.BooleanVar(value=force_draft)
+        ttk.Label(box, text='Envoi des nouveaux produits : ' + ('brouillon' if force_draft else 'statut du CSV')).pack(anchor='w', pady=(8, 0))
         self.select = ttk.Button(box, text='Choisir et contrôler un CSV…', command=self.choose)
         self.select.pack(anchor='w', pady=12)
         self.mapping_button = ttk.Button(box, text='Revoir les correspondances…', command=self.review_mappings, state='disabled')
@@ -67,10 +66,6 @@ class ProductsDialog(tk.Toplevel):
         scroll.pack(side='right', fill='y'); self.table.pack(fill='both', expand=True)
         self.details = tk.Text(box, height=6, wrap='word', state='disabled')
         self.details.pack(fill='x')
-
-    def change_draft_mode(self):
-        if not self.busy and self.source.get() != 'Aucun CSV sélectionné':
-            self.review_mappings()
 
     def detail(self, text):
         self.details.configure(state='normal'); self.details.delete('1.0', 'end')
@@ -111,7 +106,6 @@ class ProductsDialog(tk.Toplevel):
 
     def run(self, kind, operation):
         self.busy = True
-        self.draft_check.configure(state='disabled')
         self.select.configure(state='disabled'); self.send.configure(state='disabled'); self.mapping_button.configure(state='disabled')
         def worker():
             try:
@@ -164,7 +158,6 @@ class ProductsDialog(tk.Toplevel):
                 self.status.set(result)
                 continue
             self.busy = False
-            self.draft_check.configure(state='normal')
             self.select.configure(state='normal'); self.mapping_button.configure(state='normal')
             if kind == 'mappings':
                 if result['rows']:
