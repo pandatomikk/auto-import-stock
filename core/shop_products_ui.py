@@ -99,7 +99,7 @@ class ProductsDialog(tk.Toplevel):
         from core.shop_publication import prepare_publication
         prepare = prepare_publication if self.publication else prepare_csv
         force_draft = self.draft.get()
-        self.run('plan', lambda: prepare(filename, self.api, self.progress, mappings=choices, force_draft=force_draft))
+        self.run('plan', lambda: prepare(filename, self.api, self.progress, mappings=choices, force_draft=force_draft, check_duplicates=True))
 
     def progress(self, text):
         self.events.put(('progress', text))
@@ -119,8 +119,41 @@ class ProductsDialog(tk.Toplevel):
         threading.Thread(target=worker, daemon=True).start()
         self.timer = self.after(100, self.poll)
 
+    def review_duplicates(self):
+        for item in self.plan['items']:
+            if not item.get('duplicate_candidates') or item.get('duplicate_decision'):
+                continue
+            dialog = tk.Toplevel(self)
+            dialog.title('Doublon possible')
+            dialog.transient(self)
+            box = ttk.Frame(dialog, padding=20)
+            box.pack(fill='both', expand=True)
+            ttk.Label(box, text='Nouveau : ' + item['name'] + ' — UGS ' + item['sku'], wraplength=650).pack(anchor='w')
+            text = tk.Text(box, width=80, height=12, wrap='word')
+            text.pack(fill='both', expand=True, pady=12)
+            for candidate in item['duplicate_candidates']:
+                origin = ('Fichier, ligne ' + str(candidate['line'])) if candidate.get('line') else ('Boutique, ID ' + str(candidate.get('id')))
+                text.insert('end', origin + ' : ' + candidate['name'] + ' — UGS ' + candidate['sku'] + '\n' + candidate['reason'] + '\n\n')
+            text.configure(state='disabled')
+            buttons = ttk.Frame(box); buttons.pack(fill='x')
+            def decide(value):
+                item['duplicate_decision'] = value
+                if value == 'skip':
+                    item['state'] = 'existing'
+                dialog.destroy()
+            ttk.Button(buttons, text='Ignorer ce produit', command=lambda: decide('skip')).pack(side='left')
+            ttk.Button(buttons, text='Créer quand même', command=lambda: decide('create')).pack(side='left', padx=8)
+            ttk.Button(buttons, text='Revenir au contrôle', command=dialog.destroy).pack(side='left')
+            dialog.grab_set()
+            self.wait_window(dialog)
+            if not item.get('duplicate_decision'):
+                return False
+        return True
+
     def start_import(self):
         if self.busy or not self.plan or self.plan['errors']:
+            return
+        if not self.review_duplicates():
             return
         filename = 'rapport_import_' + datetime.now().strftime('%Y%m%d_%H%M%S') + '_' + uuid.uuid4().hex[:8] + '.json'
         self.report_path = Path(self.plan['source']).parent / filename
@@ -169,8 +202,8 @@ class ProductsDialog(tk.Toplevel):
                 self.plan = result
                 counts = Counter(item['state'] for item in result['items'])
                 for item in result['items']:
-                    self.table.insert('', 'end', values=(item['line'], item['sku'], item['name'], ('Créer en brouillon' if item['payload'].get('status') == 'draft' else 'Créer et publier') if item['state'] == 'new' else (('Restaurer et publier' if item.get('original_status') == 'trash' else 'Mettre à jour et publier') if item['state'] == 'draft_update' else ('Ajouter les images' if item['state'] == 'images_update' else 'Ignorer : existe'))))
-                self.detail('\n'.join(result['errors'] + result.get('warnings', [])) or 'Contrôle terminé. Les données contrôlées seront utilisées telles quelles pour cet envoi.')
+                    self.table.insert('', 'end', values=(item['line'], item['sku'], item['name'], ('Doublon à vérifier' if item.get('duplicate_candidates') else 'Créer en brouillon' if item['payload'].get('status') == 'draft' else 'Créer et publier') if item['state'] == 'new' else (('Restaurer et publier' if item.get('original_status') == 'trash' else 'Mettre à jour et publier') if item['state'] == 'draft_update' else ('Ajouter les images' if item['state'] == 'images_update' else 'Ignorer : existe'))))
+                self.detail('\n'.join(result['errors'] + result.get('warnings', [])) or 'Contrôle terminé. Les doublons possibles seront à confirmer avant tout envoi.')
                 self.status.set(f"{counts['new']} à créer · {counts['draft_update']} fiche(s) à mettre à jour ou restaurer · {counts['images_update']} à compléter en images · {counts['existing']} déjà présents · {len(result['errors'])} erreur(s)" + (f" · {len(result.get('local_files', {}))} images locales" if self.publication else ''))
                 self.send.configure(text=("Importer le lot" if self.publication else "Importer les articles"), state='normal' if (counts['new'] + counts['draft_update'] + counts['images_update']) and not result['errors'] else 'disabled')
             elif kind == 'report':

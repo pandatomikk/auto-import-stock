@@ -22,7 +22,7 @@ def digest(path):
         return value.hexdigest()
 
 
-def prepare_publication(path, api, progress=lambda text: None, mappings=None, force_draft=False):
+def prepare_publication(path, api, progress=lambda text: None, mappings=None, force_draft=False, check_duplicates=False):
     path = Path(path).resolve()
     if path.stem.endswith('_preparation'):
         raise ConnectionFailure('Sélectionnez le CSV final : cette préparation attend encore ses images.')
@@ -42,7 +42,7 @@ def prepare_publication(path, api, progress=lambda text: None, mappings=None, fo
                 raise ConnectionFailure('Plusieurs images locales portent ce nom : ' + name)
             if matches:
                 overrides[location] = {'_local_path': str(matches[0])}
-    plan = prepare_csv(path, api, progress, mappings, image_overrides=overrides, force_draft=force_draft)
+    plan = prepare_csv(path, api, progress, mappings, image_overrides=overrides, force_draft=force_draft, check_duplicates=check_duplicates)
     files = {}
     for item in plan['items']:
         for image in item.get('payload', {}).get('images', []):
@@ -67,6 +67,8 @@ def prepare_publication(path, api, progress=lambda text: None, mappings=None, fo
 
 
 def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=upload_image, renamer=rename_existing_image):
+    from core.product_duplicates import require_duplicate_decisions
+    require_duplicate_decisions(plan)
     if plan['errors'] or plan['site'] != api.url:
         raise ConnectionFailure('Contrôle invalide : sélectionnez à nouveau le CSV.')
     source = Path(plan['source'])
@@ -95,6 +97,9 @@ def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=up
         # Recheck before media uploads, including image-only updates.
         needed = set()
         for item in prepared['items']:
+            if item['state'] == 'existing':
+                item.pop('payload', None)
+                continue
             if item['state'] == 'new' and api.existing(item['sku']):
                 item['state'] = 'existing'; item.pop('payload', None)
             if item['state'] == 'draft_update':

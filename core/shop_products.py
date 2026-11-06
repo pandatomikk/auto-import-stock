@@ -354,7 +354,7 @@ def row_payload(row, resolver):
     return payload
 
 
-def prepare_csv(path, api, progress=lambda text: None, mappings=None, image_overrides=None, force_draft=False):
+def prepare_csv(path, api, progress=lambda text: None, mappings=None, image_overrides=None, force_draft=False, check_duplicates=False):
     rows = read_products_csv(path)
     resolver = Resolver(api, mappings, image_overrides)
     plan = {'site': api.url, 'source': str(Path(path).resolve()), 'items': [], 'errors': []}
@@ -400,12 +400,18 @@ def prepare_csv(path, api, progress=lambda text: None, mappings=None, image_over
     for field, label in [('images', 'image'), ('categories', 'catégorie')]:
         count = sum(not item['payload'].get(field) for item in new)
         if count: plan['warnings'].append(f'{count} nouvel article(s) sans {label}. Vérifiez que ce CSV est bien le résultat de la dernière préparation finalisée.')
+    if check_duplicates:
+        from core.product_duplicates import detect_duplicates
+        progress('Recherche des doublons dans le catalogue de la boutique…')
+        detect_duplicates(plan, api.listing('wc/v3/products'))
     return plan
 
 
 def import_plan(plan, api, report_path, progress=lambda text: None):
     if plan['errors'] or plan['site'] != api.url:
         raise ConnectionFailure('Aperçu invalide ou boutique différente : recommencez le contrôle.')
+    from core.product_duplicates import require_duplicate_decisions
+    require_duplicate_decisions(plan)
     report = {'site': api.url, 'source': plan['source'], 'total': len(plan['items']), 'correspondences': plan.get('correspondences', []), 'results': []}
     def save():
         atomic_write(report_path, json.dumps(report, ensure_ascii=False, indent=2).encode())
@@ -413,6 +419,9 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
     product_progress = ConversionProgress(sum(item['state'] != 'existing' for item in plan['items']))
     for item in plan['items']:
         record = {k: item[k] for k in ('line', 'sku', 'name')}
+        if item.get('duplicate_candidates'):
+            record['duplicate_candidates'] = item['duplicate_candidates']
+            record['duplicate_decision'] = item.get('duplicate_decision')
         if item['state'] == 'existing':
             record['state'] = 'skipped'
             report['results'].append(record); save()

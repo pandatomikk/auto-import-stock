@@ -59,6 +59,20 @@ class LotsPublicationTests(unittest.TestCase):
         publish_plan(plan, self.api, self.root/'again.json', uploader=self.upload)
         self.assertEqual(self.upload.call_count, 1)
 
+    def test_duplicate_decision_precedes_upload_and_skip_sends_no_media(self):
+        plan = prepare_publication(self.csv, self.api)
+        candidate = plan['items'][0]
+        candidate['duplicate_candidates'] = [{'id': 99, 'name': 'Article', 'reason': 'Nom identique'}]
+        with self.assertRaises(ConnectionFailure):
+            publish_plan(plan, self.api, self.root/'pending.json', uploader=self.upload)
+        self.upload.assert_not_called()
+        candidate['duplicate_decision'] = 'skip'
+        candidate['state'] = 'existing'
+        report = publish_plan(plan, self.api, self.root/'skipped.json', uploader=self.upload)
+        self.upload.assert_not_called()
+        self.assertFalse(self.api.created)
+        self.assertEqual(report['results'][0]['duplicate_decision'], 'skip')
+
     def test_images_added_after_preview_prevent_upload(self):
         write_csv(self.csv, ['UGS', 'Nom', 'Images'], [{'UGS': 'OLD', 'Nom': 'Article', 'Images': 'photo.webp'}])
         self.api.products['OLD'] = {'id': 42, 'sku': 'OLD', 'status': 'publish', 'images': []}

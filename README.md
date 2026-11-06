@@ -454,3 +454,9 @@ Calcul du prix de vente configurable par profil, avec arithmétique décimale et
 ### Envoi en brouillon par défaut (en développement)
 
 L’écran principal propose, entre le test sur cinq produits et la récupération des descriptions, « Envoyer les nouveaux produits en brouillon », cochée par défaut. Le choix s’applique au contrôle et à l’envoi, sans modifier le CSV. Les brouillons existants ne sont pas publiés dans ce mode. Décochez la case pour respecter le statut du CSV, notamment pour publier les brouillons existants. Le choix est repris à l’ouverture de la fenêtre d’envoi ; l’aperçu distingue « Créer en brouillon » et « Créer et publier ».
+
+### Contrôle des doublons par nom (en développement)
+
+Le contrôle depuis l’interface compare les nouveaux produits au catalogue WooCommerce et aux lignes précédentes du lot. Il normalise casse, accents, ponctuation, ordre des mots et particules ; une liste limitée de synonymes et une comparaison prudente signalent aussi des noms proches. Un EAN identique est signalé même si les noms diffèrent. Deux EAN renseignés différents, des marques connues distinctes ou des différences connues de couleur, taille ou numéro de modèle écartent le rapprochement par nom. Les informations absentes ne permettent pas de garantir que deux modèles sont identiques.
+
+Avant tout envoi, chaque produit signalé demande « Ignorer ce produit » ou « Créer quand même », avec les noms, UGS et l’origine des correspondances. Revenir au contrôle laisse l’envoi en attente. Aucun produit n’est fusionné automatiquement. Les décisions et correspondances sont conservées dans le rapport d’import ; elles sont redemandées après un nouveau contrôle. Les doublons apparus sur la boutique après le contrôle restent couverts par la vérification existante des UGS, mais les noms ne sont pas rescannés pendant l’envoi.

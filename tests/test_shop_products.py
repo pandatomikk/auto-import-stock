@@ -83,6 +83,25 @@ class ProductTests(unittest.TestCase):
         self.assertEqual(path.read_bytes(), original)
         self.assertEqual(prepare_csv(path, self.api)['items'][1]['state'], 'draft_update')
 
+    def test_name_duplicate_blocks_writes_until_explicit_choice(self):
+        listing = self.api.listing
+        self.api.listing = lambda route: [{'id': 99, 'sku': 'OTHER', 'name': 'Sac main Emilie'}] if route == 'wc/v3/products' else listing(route)
+        plan = prepare_csv(self.csv([{'UGS': 'NEW', 'Nom': 'Sac à main Émilie'}]), self.api, check_duplicates=True)
+        self.assertTrue(plan['items'][0]['duplicate_candidates'])
+        with self.assertRaises(ConnectionFailure):
+            import_plan(plan, self.api, self.folder / 'pending.json')
+        self.assertFalse(self.api.created)
+        plan['items'][0]['duplicate_decision'] = 'skip'
+        plan['items'][0]['state'] = 'existing'
+        report = import_plan(plan, self.api, self.folder / 'skip.json')
+        self.assertFalse(self.api.created)
+        self.assertEqual(report['results'][0]['duplicate_decision'], 'skip')
+        plan['items'][0]['duplicate_decision'] = 'create'
+        plan['items'][0]['state'] = 'new'
+        report = import_plan(plan, self.api, self.folder / 'create.json')
+        self.assertEqual(len(self.api.created), 1)
+        self.assertEqual(report['results'][0]['duplicate_decision'], 'create')
+
     def test_existing_draft_is_updated_and_published_with_same_id(self):
         self.api.products['DRAFT'] = {'id': 42, 'sku': 'DRAFT', 'status': 'draft'}
         self.api.publish_draft = Mock(return_value={'id':42, 'sku':'DRAFT', 'status':'publish'})
