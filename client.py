@@ -138,6 +138,19 @@ class Client(tk.Tk):
   w=ttk.Entry(box,textvariable=var);w.grid(row=row,column=1,sticky='ew');self.inputs.append(w)
   if command:
    w=ttk.Button(box,text='Parcourir…',command=command);w.grid(row=row,column=2,padx=6);self.inputs.append(w)
+ def edit_drive_sources(self):
+  from core.drive_sources import parse_drive_sources
+  dialog=tk.Toplevel(self);dialog.title('Sources Google Drive');dialog.transient(self)
+  box=ttk.Frame(dialog,padding=20);box.pack(fill='both',expand=True)
+  ttk.Label(box,text='Un lien de dossier Google Drive par ligne. Tous les liens seront explorés.').pack(anchor='w')
+  editor=tk.Text(box,width=85,height=8,wrap='word');editor.pack(fill='both',expand=True,pady=12)
+  editor.insert('1.0',self.drive.get().replace(';','\n'))
+  def save():
+   try:sources=parse_drive_sources(editor.get('1.0','end'))
+   except ValueError as exc:messagebox.showerror('Sources Google Drive',str(exc),parent=dialog);return
+   self.drive.set('; '.join(sources));dialog.destroy()
+  ttk.Button(box,text='Enregistrer les liens',command=save).pack(anchor='w')
+  dialog.grab_set()
  def pick(self,var):
   value=filedialog.askopenfilename(filetypes=[('Archive ZIP','*.zip'),('Tous les fichiers','*')] if var is self.drive else [('Tous les fichiers','*')])
   if value:var.set(value)
@@ -212,9 +225,11 @@ class Client(tk.Tk):
   if event is not None or not self.drive.get():self.drive.set(self.image_values.get(brand,settings.get('drive_url','')))
   self.previous_brand=brand
   is_drive=settings.get('mode')=='drive'
-  self.image_label.configure(text='Dossier Google Drive' if is_drive else 'ZIP des images')
-  if is_drive:self.image_browse.grid_remove()
-  else:self.image_browse.grid()
+  self.image_label.configure(text='Dossiers Google Drive' if is_drive else 'ZIP des images')
+  if is_drive:
+   self.image_browse.configure(text='Gérer les liens…',command=self.edit_drive_sources);self.image_browse.grid()
+  else:
+   self.image_browse.configure(text='Parcourir…',command=lambda:self.pick(self.drive));self.image_browse.grid()
   self.test_widget.configure(state='normal')
   no_images=settings.get('mode')=='none'
   if no_images:

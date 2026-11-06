@@ -92,7 +92,7 @@ def main() -> int:
     parser.add_argument("--no-web-descriptions", action="store_true", help="Désactiver la récupération des descriptions fournisseur")
     parser.add_argument("--ocr-lang", help="Langue Tesseract facture, défaut fra")
     parser.add_argument("--force-ocr", action="store_true", help="Forcer OCR même sur PDF avec texte")
-    parser.add_argument("--drive-url", help="Dossier Drive facture")
+    parser.add_argument("--drive-url", help="Dossiers Drive facture, séparés par des points-virgules ou retours à la ligne")
     parser.add_argument("--download-dir", type=Path, help="Dossier du cache et des rapports images facture")
     parser.add_argument("--refresh-drive", action="store_true", help="Relire la liste Drive")
     parser.add_argument("--plan-images", action="store_true", help="Lister les images correspondantes sans téléchargement")
