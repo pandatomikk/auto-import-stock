@@ -47,7 +47,10 @@ class ProductsDialog(tk.Toplevel):
         canvas.bind('<Configure>', lambda event: canvas.itemconfigure(window, width=event.width))
         ttk.Label(box, text='Publier un lot sur le site' if publication else 'Créer des articles depuis un CSV', font=('Arial', 16, 'bold')).pack(anchor='w')
         ttk.Label(box, text='Boutique : ' + self.api.url, wraplength=850).pack(anchor='w', pady=8)
-        ttk.Label(box, text=('Choisissez le CSV final du lot. Après contrôle, ses images locales seront envoyées puis ses produits publiés. Les brouillons et produits dans la corbeille seront mis à jour et publiés ; les produits publiés sans image recevront les photos du CSV.' if publication else 'Produits simples. Les brouillons seront mis à jour et publiés si le CSV demande la publication. Les produits publiés sans image recevront les photos du CSV. Les images et les catégories doivent déjà exister sur le site.'), wraplength=850).pack(anchor='w')
+        ttk.Label(box, text=('Choisissez le CSV final du lot. Après contrôle, ses images locales seront envoyées puis ses nouveaux produits créés en brouillon par défaut. Décochez la case pour respecter le statut du CSV. Les brouillons et produits dans la corbeille ne seront publiés que dans ce dernier mode ; les produits publiés sans image recevront les photos du CSV.' if publication else 'Produits simples, créés en brouillon par défaut. Décochez la case pour respecter le statut du CSV et permettre la publication des brouillons existants. Les produits publiés sans image recevront les photos du CSV. Les images et les catégories doivent déjà exister sur le site.'), wraplength=850).pack(anchor='w')
+        self.draft = tk.BooleanVar(value=True)
+        self.draft_check = ttk.Checkbutton(box, text='Envoyer les nouveaux produits en brouillon', variable=self.draft, command=self.change_draft_mode)
+        self.draft_check.pack(anchor='w', pady=(8, 0))
         self.select = ttk.Button(box, text='Choisir et contrôler un CSV…', command=self.choose)
         self.select.pack(anchor='w', pady=12)
         self.mapping_button = ttk.Button(box, text='Revoir les correspondances…', command=self.review_mappings, state='disabled')
@@ -64,6 +67,10 @@ class ProductsDialog(tk.Toplevel):
         scroll.pack(side='right', fill='y'); self.table.pack(fill='both', expand=True)
         self.details = tk.Text(box, height=6, wrap='word', state='disabled')
         self.details.pack(fill='x')
+
+    def change_draft_mode(self):
+        if not self.busy and self.source.get() != 'Aucun CSV sélectionné':
+            self.review_mappings()
 
     def detail(self, text):
         self.details.configure(state='normal'); self.details.delete('1.0', 'end')
@@ -96,13 +103,15 @@ class ProductsDialog(tk.Toplevel):
         filename = self.source.get()
         from core.shop_publication import prepare_publication
         prepare = prepare_publication if self.publication else prepare_csv
-        self.run('plan', lambda: prepare(filename, self.api, self.progress, mappings=choices))
+        force_draft = self.draft.get()
+        self.run('plan', lambda: prepare(filename, self.api, self.progress, mappings=choices, force_draft=force_draft))
 
     def progress(self, text):
         self.events.put(('progress', text))
 
     def run(self, kind, operation):
         self.busy = True
+        self.draft_check.configure(state='disabled')
         self.select.configure(state='disabled'); self.send.configure(state='disabled'); self.mapping_button.configure(state='disabled')
         def worker():
             try:
@@ -155,6 +164,7 @@ class ProductsDialog(tk.Toplevel):
                 self.status.set(result)
                 continue
             self.busy = False
+            self.draft_check.configure(state='normal')
             self.select.configure(state='normal'); self.mapping_button.configure(state='normal')
             if kind == 'mappings':
                 if result['rows']:
@@ -166,7 +176,7 @@ class ProductsDialog(tk.Toplevel):
                 self.plan = result
                 counts = Counter(item['state'] for item in result['items'])
                 for item in result['items']:
-                    self.table.insert('', 'end', values=(item['line'], item['sku'], item['name'], 'Créer' if item['state'] == 'new' else (('Restaurer et publier' if item.get('original_status') == 'trash' else 'Mettre à jour et publier') if item['state'] == 'draft_update' else ('Ajouter les images' if item['state'] == 'images_update' else 'Ignorer : existe'))))
+                    self.table.insert('', 'end', values=(item['line'], item['sku'], item['name'], ('Créer en brouillon' if item['payload'].get('status') == 'draft' else 'Créer et publier') if item['state'] == 'new' else (('Restaurer et publier' if item.get('original_status') == 'trash' else 'Mettre à jour et publier') if item['state'] == 'draft_update' else ('Ajouter les images' if item['state'] == 'images_update' else 'Ignorer : existe'))))
                 self.detail('\n'.join(result['errors'] + result.get('warnings', [])) or 'Contrôle terminé. Les données contrôlées seront utilisées telles quelles pour cet envoi.')
                 self.status.set(f"{counts['new']} à créer · {counts['draft_update']} fiche(s) à mettre à jour ou restaurer · {counts['images_update']} à compléter en images · {counts['existing']} déjà présents · {len(result['errors'])} erreur(s)" + (f" · {len(result.get('local_files', {}))} images locales" if self.publication else ''))
                 self.send.configure(text=("Importer le lot" if self.publication else "Importer les articles"), state='normal' if (counts['new'] + counts['draft_update'] + counts['images_update']) and not result['errors'] else 'disabled')

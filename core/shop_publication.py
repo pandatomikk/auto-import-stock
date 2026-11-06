@@ -22,7 +22,7 @@ def digest(path):
         return value.hexdigest()
 
 
-def prepare_publication(path, api, progress=lambda text: None, mappings=None):
+def prepare_publication(path, api, progress=lambda text: None, mappings=None, force_draft=False):
     path = Path(path).resolve()
     if path.stem.endswith('_preparation'):
         raise ConnectionFailure('Sélectionnez le CSV final : cette préparation attend encore ses images.')
@@ -42,7 +42,7 @@ def prepare_publication(path, api, progress=lambda text: None, mappings=None):
                 raise ConnectionFailure('Plusieurs images locales portent ce nom : ' + name)
             if matches:
                 overrides[location] = {'_local_path': str(matches[0])}
-    plan = prepare_csv(path, api, progress, mappings, image_overrides=overrides)
+    plan = prepare_csv(path, api, progress, mappings, image_overrides=overrides, force_draft=force_draft)
     files = {}
     for item in plan['items']:
         for image in item.get('payload', {}).get('images', []):

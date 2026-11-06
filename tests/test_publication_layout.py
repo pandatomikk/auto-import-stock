@@ -15,9 +15,11 @@ class PublicationLayoutTests(unittest.TestCase):
         style.configure('Primary.TButton', padding=(16,10))
         dialog = ProductsDialog(owner, Credentials('https://shop.example', consumer_key='k', consumer_secret='s'), publication=True)
         try:
+            self.assertTrue(dialog.draft.get())
             dialog.geometry('720x420'); dialog.update()
-            dialog.events.put(('plan', {'items':[{'state':'new','line':2,'sku':'ABC','name':'Article','payload':{}}], 'errors':[], 'local_files':{'photo.webp':'hash'}, 'source':'/tmp/articles.csv'}))
+            dialog.events.put(('plan', {'items':[{'state':'new','line':2,'sku':'ABC','name':'Article','payload':{'status':'draft'}}], 'errors':[], 'local_files':{'photo.webp':'hash'}, 'source':'/tmp/articles.csv'}))
             dialog.poll(); dialog.update()
+            self.assertEqual(dialog.table.item(dialog.table.get_children()[0], 'values')[-1], 'Créer en brouillon')
             self.assertEqual(dialog.send['text'], 'Importer le lot')
             self.assertEqual(str(dialog.send['state']), 'normal')
             self.assertGreaterEqual(dialog.send.winfo_height(), dialog.send.winfo_reqheight())

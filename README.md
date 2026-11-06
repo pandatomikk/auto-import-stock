@@ -450,3 +450,7 @@ Le pack privé peut activer `diagnostic_cloud` dans `client.json` avec `enabled`
 ## Version 0.36
 
 Calcul du prix de vente configurable par profil, avec arithmétique décimale et arrondi à deux décimales. Le pack privé Le Tanneur applique désormais `PU ÷ 0,95 × 2,5`, PU étant le prix d’achat. Régénérer les CSV après mise à jour du moteur et du pack ; les tarifs des produits déjà publiés ne sont pas modifiés automatiquement.
+
+### Envoi en brouillon par défaut (en développement)
+
+La fenêtre d’envoi propose « Envoyer les nouveaux produits en brouillon », cochée par défaut. Le choix s’applique au contrôle et à l’envoi, sans modifier le CSV. Les brouillons existants ne sont pas publiés dans ce mode. Décochez la case pour respecter le statut du CSV, notamment pour publier les brouillons existants. Tout changement relance le contrôle ; l’aperçu distingue « Créer en brouillon » et « Créer et publier ».

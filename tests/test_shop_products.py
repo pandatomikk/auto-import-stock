@@ -68,6 +68,21 @@ class ProductTests(unittest.TestCase):
         import_plan(plan, self.api, self.folder / 'report2.json')
         self.assertEqual(len(self.api.created), 1)
 
+    def test_force_draft_overrides_csv_and_does_not_publish_existing_draft(self):
+        self.api.products['DRAFT'] = {'id': 42, 'sku': 'DRAFT', 'status': 'draft'}
+        path = self.csv([{'UGS': 'NEW', 'Nom': 'Sac', 'Publié': '1'},
+                         {'UGS': 'DRAFT', 'Nom': 'Existant', 'Publié': '1'}])
+        original = path.read_bytes()
+        plan = prepare_csv(path, self.api, force_draft=True)
+        self.assertFalse(plan['errors'])
+        self.assertEqual(plan['items'][0]['payload']['status'], 'draft')
+        self.assertEqual(plan['items'][1]['state'], 'existing')
+        report = import_plan(plan, self.api, self.folder / 'draft-report.json')
+        self.assertEqual([r['state'] for r in report['results']], ['created', 'skipped'])
+        self.assertEqual(self.api.created[0]['status'], 'draft')
+        self.assertEqual(path.read_bytes(), original)
+        self.assertEqual(prepare_csv(path, self.api)['items'][1]['state'], 'draft_update')
+
     def test_existing_draft_is_updated_and_published_with_same_id(self):
         self.api.products['DRAFT'] = {'id': 42, 'sku': 'DRAFT', 'status': 'draft'}
         self.api.publish_draft = Mock(return_value={'id':42, 'sku':'DRAFT', 'status':'publish'})

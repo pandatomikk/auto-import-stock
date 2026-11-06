@@ -354,12 +354,14 @@ def row_payload(row, resolver):
     return payload
 
 
-def prepare_csv(path, api, progress=lambda text: None, mappings=None, image_overrides=None):
+def prepare_csv(path, api, progress=lambda text: None, mappings=None, image_overrides=None, force_draft=False):
     rows = read_products_csv(path)
     resolver = Resolver(api, mappings, image_overrides)
     plan = {'site': api.url, 'source': str(Path(path).resolve()), 'items': [], 'errors': []}
     seen = set()
     for index, row in rows:
+        if force_draft:
+            row = dict(row, **{'Publié': '-1'})
         sku = row.get('UGS', '')
         progress(f'Contrôle de la ligne {index} : {sku}')
         try:
