@@ -59,6 +59,42 @@ class LotsPublicationTests(unittest.TestCase):
         publish_plan(plan, self.api, self.root/'again.json', uploader=self.upload)
         self.assertEqual(self.upload.call_count, 1)
 
+    def test_legacy_cabaia_csv_skips_products_without_photos(self):
+        from core.shop_products import read_products_csv
+
+        write_csv(self.csv, ['UGS', 'Nom', 'Marques', 'Images'], [
+            {'UGS': 'NO-PHOTO', 'Nom': 'Vanity', 'Marques': 'CABAIA', 'Images': ' , '},
+            {'UGS': 'WITH-PHOTO', 'Nom': 'Sac', 'Marques': 'Cabaïa', 'Images': 'photo.webp'},
+        ])
+        listing = self.api.listing
+        self.api.listing = lambda route: [{'id': 8, 'name': 'Cabaïa'}] if route.endswith('/brands') else listing(route)
+        plan = prepare_publication(self.csv, self.api, force_draft=True)
+        self.assertFalse(plan['errors'])
+        self.assertEqual([item['state'] for item in plan['items']], ['no_images', 'new'])
+
+        report = publish_plan(plan, self.api, self.root/'report.json', uploader=self.upload)
+        self.assertEqual(report['results'][0]['reason'], 'sans_photo')
+        self.assertEqual([item['sku'] for item in self.api.created], ['WITH-PHOTO'])
+        self.assertNotIn(('GET', 'NO-PHOTO'), self.api.calls)
+        online = read_products_csv(self.csv.with_name('articles_en_ligne.csv'))
+        self.assertEqual([row['UGS'] for _, row in online], ['WITH-PHOTO'])
+
+    def test_progress_is_reported_before_remote_recheck(self):
+        plan = prepare_publication(self.csv, self.api)
+        messages = []
+        snapshots = []
+
+        def recheck(sku):
+            self.assertEqual(messages[0], 'Vérification du CSV et des images locales avant envoi…')
+            self.assertTrue(messages[-1].endswith('· UGS NEW'))
+            self.assertEqual((snapshots[-1]['done'], snapshots[-1]['total'], snapshots[-1]['eta']), (0, 1, None))
+            raise ConnectionFailure('WooCommerce indisponible')
+
+        with patch.object(self.api, 'existing', side_effect=recheck), self.assertRaisesRegex(ConnectionFailure, 'WooCommerce indisponible'):
+            publish_plan(plan, self.api, self.root/'report.json', progress=messages.append,
+                         uploader=self.upload, on_status=snapshots.append)
+        self.upload.assert_not_called()
+
     def test_duplicate_decision_precedes_upload_and_skip_sends_no_media(self):
         plan = prepare_publication(self.csv, self.api)
         candidate = plan['items'][0]
@@ -158,8 +194,9 @@ class LotsPublicationTests(unittest.TestCase):
         write_csv(self.csv, ['UGS','Nom','Images'], [{'UGS':'NEW','Nom':'A','Images':'photo.webp'}, {'UGS':'NEW2','Nom':'B','Images':'other.webp'}])
         plan = prepare_publication(self.csv, self.api)
         messages = []
-        with patch('core.shop_publication.time.monotonic', side_effect=[0,5,5,10,10,13,13,16]):
+        with patch('core.shop_publication.time.monotonic', side_effect=[0,2,2,4,4,9,9,14,14,17,17,20]):
             publish_plan(plan, self.api, self.root/'report.json', progress=messages.append, uploader=self.upload)
+        self.assertTrue(any('Vérification des produits sur la boutique : 1/2' in text and '2 s' in text for text in messages))
         self.assertTrue(any('Envoi des images : 1/2' in text and '5 s' in text for text in messages))
         self.assertTrue(any('Création des articles : 1/2' in text and '3 s' in text for text in messages))
         self.assertIn('Création des articles : 2/2 · étape terminée', messages)

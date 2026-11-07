@@ -66,11 +66,12 @@ def prepare_publication(path, api, progress=lambda text: None, mappings=None, fo
     return plan
 
 
-def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=upload_image, renamer=rename_existing_image):
+def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=upload_image, renamer=rename_existing_image, *, on_status=None):
     from core.product_duplicates import require_duplicate_decisions
     require_duplicate_decisions(plan)
     if plan['errors'] or plan['site'] != api.url:
         raise ConnectionFailure('Contrôle invalide : sélectionnez à nouveau le CSV.')
+    progress('Vérification du CSV et des images locales avant envoi…')
     source = Path(plan['source'])
     if digest(source) != plan['source_hash']:
         raise ConnectionFailure('Le CSV a changé depuis le contrôle. Sélectionnez-le à nouveau.')
@@ -96,10 +97,15 @@ def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=up
         prepared = copy.deepcopy(plan)
         # Recheck before media uploads, including image-only updates.
         needed = set()
+        total_to_check = sum(item['state'] not in ('existing', 'no_images') for item in prepared['items'])
+        verification = ConversionProgress(total_to_check)
         for item in prepared['items']:
-            if item['state'] == 'existing':
+            if item['state'] in ('existing', 'no_images'):
                 item.pop('payload', None)
                 continue
+            started = time.monotonic()
+            progress(publication_status('Vérification des produits sur la boutique', verification,
+                                        f"UGS {item['sku']}", on_status=on_status))
             if item['state'] == 'new' and api.existing(item['sku']):
                 item['state'] = 'existing'; item.pop('payload', None)
             if item['state'] == 'draft_update':
@@ -115,6 +121,10 @@ def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=up
                         or current[0].get('images') != []):
                     item['state'] = 'existing'; item.pop('payload', None)
             needed.update(image['_local_path'] for image in item.get('payload', {}).get('images', []) if '_local_path' in image)
+            verification.update(time.monotonic() - started)
+            progress(publication_status('Vérification des produits sur la boutique', verification, on_status=on_status))
+        if on_status is not None:
+            on_status(None)
         from core.media_library import MediaLibrary, generated_identity, upload_name, normalized_name
         progress('Vérification des images déjà présentes dans la médiathèque…')
         library = MediaLibrary(api) if needed else None
@@ -147,7 +157,7 @@ def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=up
             previous = journal['images'].get(key)
             cached = bool(previous)
             started = time.monotonic()
-            progress(publication_status('Envoi des images', image_progress, Path(filename).name))
+            progress(publication_status('Envoi des images', image_progress, Path(filename).name, on_status=on_status))
             if not previous:
                 journal['images'][key] = {'state': 'unconfirmed', 'filename': Path(filename).name}
                 save()  # Persist BEFORE the network write.
@@ -172,7 +182,10 @@ def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=up
                     save()
             uploaded[filename] = previous
             image_progress.update(time.monotonic() - started, cached=cached)
-            progress(publication_status('Envoi des images', image_progress))
+            progress(publication_status('Envoi des images', image_progress, on_status=on_status))
+        if on_status is not None:
+            on_status(None)
+        progress("Finalisation des liens d’images…")
         locations = {}
         for item in prepared['items']:
             for image in item.get('payload', {}).get('images', []):
@@ -180,7 +193,9 @@ def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=up
                     filename = image.pop('_local_path')
                     image['id'] = uploaded[filename]['id']
                     locations[Path(filename).name] = uploaded[filename]['url']
-        rows = [row for _, row in read_products_csv(source)]
+        skipped_lines = {item['line'] for item in prepared['items'] if item['state'] == 'no_images'}
+        csv_rows = read_products_csv(source)
+        rows = [row for line, row in csv_rows if line not in skipped_lines]
         for row in rows:
             values = []
             for value in split_values(row.get('Images', '')):
@@ -190,9 +205,9 @@ def publish_plan(plan, api, report_path, progress=lambda text: None, uploader=up
                 row['Images'] = ', '.join(values)
         online = source.with_name(source.stem + '_en_ligne.csv')
         temporary = online.with_suffix('.tmp')
-        write_csv(temporary, list(rows[0]), rows)
+        write_csv(temporary, list(csv_rows[0][1]), rows)
         temporary.replace(online)
         progress('Images prêtes. Création des nouveaux produits…')
-        return import_plan(prepared, api, report_path, progress)
+        return import_plan(prepared, api, report_path, progress, on_status=on_status)
     finally:
         lock.unlink(missing_ok=True)

@@ -361,7 +361,7 @@ En ligne de commande, utiliser `--test-products` pour le test et `--all-products
 
 Configuration du pack privé dans Ma boutique, création de marques WooCommerce, classement des produits piloté par les profils privés, et images par référence/couleur en une étape. Mettre à jour le moteur avant le pack client.
 
-À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.37 sera 0.38, sauf demande explicite différente.
+À chaque passage de dev vers main, incrémenter la version applicative dans `core/version.py`, actualiser ces notes et créer le tag correspondant après validation. La prochaine livraison après 0.38 sera 0.39, sauf demande explicite différente.
 
 ## Version 0.22
 
@@ -474,3 +474,9 @@ La recherche des photos affiche le nombre de produits couverts sur l’ensemble 
 ## Version 0.37
 
 Création en brouillon par défaut depuis la case de l’écran principal, contrôle des doublons probables avec choix explicite, plusieurs sources Drive Cabaïa avec estimation de recherche et diagnostics par source. Le pack privé compatible ajoute Excel Cabaïa, accepte les dossiers publics vides, ignore les produits sans photo pour les descriptions et le CSV final, et extrait les sections de description détaillée et de composition/entretien. Les sections absentes ou inaccessibles restent signalées ; la validation réelle complète de cette extraction est prévue au prochain batch, les requêtes fournisseur ayant été limitées par HTTP 429 pendant le développement. Mettre à jour le moteur avant le pack privé, redémarrer puis régénérer les CSV.
+
+## Version 0.38
+
+La fenêtre d’import affiche le temps écoulé et l’avancement par étape. Le temps restant est estimé après la première opération mesurée pour la vérification des références, l’envoi des images et la création des fiches.
+
+Les articles Cabaïa sans photo sont signalés et ignorés à l’import, y compris avec un CSV préparé avant la mise à jour du pack privé. Ils sont aussi écartés du CSV d’import en ligne généré par l’application.

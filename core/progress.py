@@ -19,7 +19,7 @@ def preparation_event(stage, message, done=None, total=None):
 
 
 class ConversionProgress:
-    """Sequential photo ETA; measure image work only, excluding catalogue lookups."""
+    """Estimate a sequential phase from completed operations."""
     def __init__(self, total):
         self.total = total
         self.done = 0
@@ -66,11 +66,13 @@ def format_image_eta(seconds):
     return 'Temps restant pour les images : environ ' + duration
 
 
-def publication_status(label, tracker, current=''):
+def publication_status(label, tracker, current='', *, on_status=None):
     event = tracker.snapshot()
+    if on_status is not None:
+        on_status(event)
     seconds = event['eta']
     if seconds is None:
-        estimate = 'estimation après le premier envoi…'
+        estimate = 'estimation après la première opération…'
     elif seconds == 0:
         estimate = 'étape terminée'
     else:

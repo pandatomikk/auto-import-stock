@@ -370,6 +370,10 @@ def prepare_csv(path, api, progress=lambda text: None, mappings=None, image_over
             if sku.casefold() in seen:
                 raise ConnectionFailure('UGS présente plusieurs fois dans le CSV.')
             seen.add(sku.casefold())
+            brands = {brand.casefold() for brand in split_values(row.get('Marques', ''))}
+            if brands & {'cabaïa', 'cabaia'} and not split_values(row.get('Images', '')):
+                plan['items'].append({'line': index, 'sku': sku, 'name': row.get('Nom', ''), 'state': 'no_images'})
+                continue
             existing = api.existing(sku)
             if len(existing) > 1:
                 raise ConnectionFailure('Plusieurs produits portent cette UGS : vérifiez la boutique.')
@@ -407,7 +411,7 @@ def prepare_csv(path, api, progress=lambda text: None, mappings=None, image_over
     return plan
 
 
-def import_plan(plan, api, report_path, progress=lambda text: None):
+def import_plan(plan, api, report_path, progress=lambda text: None, *, on_status=None):
     if plan['errors'] or plan['site'] != api.url:
         raise ConnectionFailure('Aperçu invalide ou boutique différente : recommencez le contrôle.')
     from core.product_duplicates import require_duplicate_decisions
@@ -416,18 +420,21 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
     def save():
         atomic_write(report_path, json.dumps(report, ensure_ascii=False, indent=2).encode())
     save()  # Verify report storage before any product is created.
-    product_progress = ConversionProgress(sum(item['state'] != 'existing' for item in plan['items']))
+    product_progress = ConversionProgress(sum(item['state'] not in ('existing', 'no_images') for item in plan['items']))
     for item in plan['items']:
         record = {k: item[k] for k in ('line', 'sku', 'name')}
         if item.get('duplicate_candidates'):
             record['duplicate_candidates'] = item['duplicate_candidates']
             record['duplicate_decision'] = item.get('duplicate_decision')
-        if item['state'] == 'existing':
+        if item['state'] in ('existing', 'no_images'):
             record['state'] = 'skipped'
+            if item['state'] == 'no_images':
+                record['reason'] = 'sans_photo'
+                record['message'] = f"{item['sku']} ignoré : aucune photo dans le CSV."
             report['results'].append(record); save()
             continue
         started = time.monotonic()
-        progress(publication_status('Création des articles', product_progress, item['sku']))
+        progress(publication_status('Création des articles', product_progress, item['sku'], on_status=on_status))
         # Recheck immediately before POST, including when resuming after an interruption.
         existing = api.existing(item['sku'])
         updating = item['state'] == 'draft_update'
@@ -438,6 +445,7 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
             record['state'] = 'skipped'
             report['results'].append(record); save()
             product_progress.update(time.monotonic() - started, cached=True)
+            progress(publication_status('Création des articles', product_progress, on_status=on_status))
             continue
         if updating and not existing:
             raise ConnectionFailure('Brouillon introuvable : recommencez le contrôle.')
@@ -445,7 +453,7 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
             record['state'] = 'skipped'
             report['results'].append(record); save()
             product_progress.update(time.monotonic() - started, cached=True)
-            progress(publication_status('Création des articles', product_progress))
+            progress(publication_status('Création des articles', product_progress, on_status=on_status))
             continue
         record['state'] = 'unconfirmed'
         report['results'].append(record); save()
@@ -456,6 +464,7 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
                     record['state'] = 'skipped'
                     save()
                     product_progress.update(time.monotonic() - started, cached=True)
+                    progress(publication_status('Création des articles', product_progress, on_status=on_status))
                     continue
             elif updating and item.get('original_status') == 'trash':
                 result = api.publish_draft(item['product_id'], item['payload'], expected_status='trash')
@@ -475,12 +484,12 @@ def import_plan(plan, api, report_path, progress=lambda text: None):
                 record['state'] = 'skipped'
                 product_progress.update(time.monotonic() - started, cached=True)
                 save()
-                progress(publication_status('Création des articles', product_progress))
+                progress(publication_status('Création des articles', product_progress, on_status=on_status))
                 continue
             if getattr(exc, 'rejected', False): record['state'] = 'rejected'
             save()
             break  # No automatic retry of a possibly successful write.
         save()
         product_progress.update(time.monotonic() - started)
-        progress(publication_status('Création des articles', product_progress))
+        progress(publication_status('Création des articles', product_progress, on_status=on_status))
     return report

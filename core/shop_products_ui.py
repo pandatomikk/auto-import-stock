@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 import queue
 import threading
+import time
 import tkinter as tk
 from tkinter import ttk
 from core import file_picker as filedialog
@@ -37,6 +38,9 @@ class ProductsDialog(tk.Toplevel):
         footer.bind('<Configure>', lambda event: status_label.configure(wraplength=max(200, event.width-40)))
         self.send = ttk.Button(footer, text='Importer le lot' if publication else 'Créer les nouveaux articles', style='Primary.TButton', state='disabled', command=self.start_import)
         self.send.pack(anchor='w')
+        self.import_progress = ttk.Progressbar(footer)
+        self.import_elapsed = ttk.Label(footer)
+        self.import_started = None
         canvas = tk.Canvas(self, highlightthickness=0)
         scrollbar = ttk.Scrollbar(self, orient='vertical', command=canvas.yview)
         canvas.configure(yscrollcommand=scrollbar.set)
@@ -90,6 +94,7 @@ class ProductsDialog(tk.Toplevel):
             return
         from core.shop_mappings import prepare_mappings
         self.plan = None
+        self.import_elapsed.pack_forget()
         self.table.delete(*self.table.get_children())
         filename = self.source.get()
         self.run('mappings', lambda: prepare_mappings(filename, self.api, self.progress))
@@ -170,7 +175,8 @@ class ProductsDialog(tk.Toplevel):
                     log.write(scrub(str(text)) + '\n')
                 self.progress(text)
             try:
-                result = operation(plan, self.api, report_path, progress)
+                result = operation(plan, self.api, report_path, progress,
+                                   on_status=lambda event: self.events.put(('import_progress', event)))
                 outcome = 'terminé ; voir le rapport pour les résultats par produit'
                 return result
             except Exception as exc:
@@ -178,7 +184,26 @@ class ProductsDialog(tk.Toplevel):
                 raise
             finally:
                 submit(report_path.parent, 'import', outcome)
+        self.import_started = time.monotonic()
+        self.status.set('Démarrage de l’import…')
+        self.import_progress.pack(fill='x', pady=(8, 0))
+        self.import_elapsed.pack(anchor='w')
+        self.update_import_progress(None)
+        self.update_import_elapsed()
         self.run('report', execute)
+
+    def update_import_progress(self, event):
+        if event is None or not event['total']:
+            if self.import_progress['mode'] != 'indeterminate':
+                self.import_progress.configure(mode='indeterminate')
+                self.import_progress.start(15)
+            return
+        self.import_progress.stop()
+        self.import_progress.configure(mode='determinate', maximum=event['total'], value=event['done'])
+
+    def update_import_elapsed(self):
+        minutes, seconds = divmod(int(time.monotonic() - self.import_started), 60)
+        self.import_elapsed.configure(text=f'Temps écoulé · {minutes} min {seconds:02d} s')
 
     def poll(self):
         self.timer = None
@@ -190,6 +215,14 @@ class ProductsDialog(tk.Toplevel):
             if kind == 'progress':
                 self.status.set(result)
                 continue
+            if kind == 'import_progress':
+                self.update_import_progress(result)
+                continue
+            if self.import_started is not None:
+                self.update_import_elapsed()
+                self.import_progress.stop()
+                self.import_progress.pack_forget()
+                self.import_started = None
             self.busy = False
             self.select.configure(state='normal'); self.mapping_button.configure(state='normal')
             if kind == 'mappings':
@@ -202,9 +235,19 @@ class ProductsDialog(tk.Toplevel):
                 self.plan = result
                 counts = Counter(item['state'] for item in result['items'])
                 for item in result['items']:
-                    self.table.insert('', 'end', values=(item['line'], item['sku'], item['name'], ('Doublon à vérifier' if item.get('duplicate_candidates') else 'Créer en brouillon' if item['payload'].get('status') == 'draft' else 'Créer et publier') if item['state'] == 'new' else (('Restaurer et publier' if item.get('original_status') == 'trash' else 'Mettre à jour et publier') if item['state'] == 'draft_update' else ('Ajouter les images' if item['state'] == 'images_update' else 'Ignorer : existe'))))
+                    state = item['state']
+                    if state == 'new':
+                        if item.get('duplicate_candidates'):
+                            action = 'Doublon à vérifier'
+                        else:
+                            action = 'Créer en brouillon' if item['payload'].get('status') == 'draft' else 'Créer et publier'
+                    elif state == 'draft_update':
+                        action = 'Restaurer et publier' if item.get('original_status') == 'trash' else 'Mettre à jour et publier'
+                    else:
+                        action = {'images_update': 'Ajouter les images', 'no_images': 'Ignorer : sans photo'}.get(state, 'Ignorer : existe')
+                    self.table.insert('', 'end', values=(item['line'], item['sku'], item['name'], action))
                 self.detail('\n'.join(result['errors'] + result.get('warnings', [])) or 'Contrôle terminé. Les doublons possibles seront à confirmer avant tout envoi.')
-                self.status.set(f"{counts['new']} à créer · {counts['draft_update']} fiche(s) à mettre à jour ou restaurer · {counts['images_update']} à compléter en images · {counts['existing']} déjà présents · {len(result['errors'])} erreur(s)" + (f" · {len(result.get('local_files', {}))} images locales" if self.publication else ''))
+                self.status.set(f"{counts['new']} à créer · {counts['draft_update']} fiche(s) à mettre à jour ou restaurer · {counts['images_update']} à compléter en images · {counts['existing']} déjà présents · {counts['no_images']} ignoré(s) sans photo · {len(result['errors'])} erreur(s)" + (f" · {len(result.get('local_files', {}))} images locales" if self.publication else ''))
                 self.send.configure(text=("Importer le lot" if self.publication else "Importer les articles"), state='normal' if (counts['new'] + counts['draft_update'] + counts['images_update']) and not result['errors'] else 'disabled')
             elif kind == 'report':
                 counts = Counter(item['state'] for item in result['results'])
@@ -215,6 +258,8 @@ class ProductsDialog(tk.Toplevel):
             else:
                 self.status.set(result)
                 self.plan = None
+        if self.import_started is not None:
+            self.update_import_elapsed()
         if self.busy and self.timer is None and not (getattr(self, 'mappings_dialog', None) and self.mappings_dialog.winfo_exists()):
             self.timer = self.after(100, self.poll)
 
